@@ -2,33 +2,50 @@ import discord
 from discord.ext import commands
 import os
 
-# Assuming your bot/client is already defined
-# bot = commands.Bot(command_prefix="!")
+# 1. Setup Intents (Required for modern Discord bots)
+intents = discord.Intents.default()
+intents.message_content = True  # Allows bot to read commands
 
+# 2. Define the Bot instance
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+# 3. Profile Update Command
 @bot.command()
 async def update_profile(ctx):
-    # Define paths to your images
+    """Updates the bot's avatar and banner from the /images folder"""
     avatar_path = "images/avatar.png"
     banner_path = "images/banner.png"
 
     try:
         # Update Avatar
         if os.path.exists(avatar_path):
-            with open(avatar_path, "rb") as avatar_file:
-                new_avatar = avatar_file.read()
-                await bot.user.edit(avatar=new_avatar)
-            print("Avatar updated successfully.")
+            with open(avatar_path, "rb") as f:
+                await bot.user.edit(avatar=f.read())
+            await ctx.send("✅ Avatar updated successfully.")
+        else:
+            await ctx.send("❌ Avatar file not found in /images.")
 
-        # Update Banner
-        # NOTE: Only 'Verified' bots or bots in specific Nitro-boosted 
-        # servers can usually have banners changed via API
+        # Update Banner (Note: Requires specific bot permissions/tier)
         if os.path.exists(banner_path):
-            with open(banner_path, "rb") as banner_file:
-                new_banner = banner_file.read()
-                await bot.user.edit(banner=new_banner)
-            print("Banner updated successfully.")
-            
-        await ctx.send("Profile updated with local assets.")
-
+            with open(banner_path, "rb") as f:
+                await bot.user.edit(banner=f.read())
+            await ctx.send("✅ Banner updated successfully.")
+        
+    except discord.HTTPException as e:
+        await ctx.send(f"⚠️ Discord API error: {e}")
     except Exception as e:
-        print(f"Error updating profile: {e}")
+        await ctx.send(f"⚠️ General error: {e}")
+
+@bot.event
+async def on_ready():
+    print(f'Logged in as {bot.user.name} (ID: {bot.user.id})')
+    print('------')
+
+# 4. Run the Bot using Environment Variables (Best practice for CI/CD)
+token = os.getenv('BOT_TOKEN')
+
+if __name__ == "__main__":
+    if token:
+        bot.run(token)
+    else:
+        print("CRITICAL ERROR: 'BOT_TOKEN' environment variable not found.")
