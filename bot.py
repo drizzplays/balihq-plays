@@ -35,7 +35,6 @@ def _get_value(row: dict, *keys: str, fallback: str = "N/A") -> str:
     for key in keys:
         value = normalized.get(key.strip().lower())
         value = str(value or "").strip()
-
         if value:
             return value
 
@@ -45,11 +44,9 @@ def _get_value(row: dict, *keys: str, fallback: str = "N/A") -> str:
 def _font(size: int, bold: bool = False):
     font_paths = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        if bold
-        else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
-        if bold
-        else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+        if bold else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
     ]
 
     for path in font_paths:
@@ -76,7 +73,6 @@ def _fit_text(
 
     for font_size in range(size, min_size - 1, -2):
         font = _font(font_size, bold)
-
         if _text_width(draw, text, font) <= max_width:
             return text, font
 
@@ -90,13 +86,7 @@ def _fit_text(
 
 
 def _rounded_rect(draw: ImageDraw.ImageDraw, box, radius, fill, outline=None, width=1):
-    draw.rounded_rectangle(
-        box,
-        radius=radius,
-        fill=fill,
-        outline=outline,
-        width=width,
-    )
+    draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=width)
 
 
 def _paste_contain(canvas: Image.Image, image_path: Path, box: tuple[int, int, int, int]):
@@ -104,15 +94,12 @@ def _paste_contain(canvas: Image.Image, image_path: Path, box: tuple[int, int, i
         return
 
     img = Image.open(image_path).convert("RGBA")
-
     target_w = box[2] - box[0]
     target_h = box[3] - box[1]
-
     img.thumbnail((target_w, target_h), Image.LANCZOS)
 
     x = box[0] + (target_w - img.width) // 2
     y = box[1] + (target_h - img.height) // 2
-
     canvas.alpha_composite(img, (x, y))
 
 
@@ -127,37 +114,16 @@ def _draw_check(draw: ImageDraw.ImageDraw, x: int, y: int):
         outline=(175, 255, 120),
         width=2,
     )
-
-    draw.line(
-        (x + 17, y + 36, x + 30, y + 50),
-        fill=(255, 255, 255),
-        width=8,
-    )
-    draw.line(
-        (x + 30, y + 50, x + 53, y + 19),
-        fill=(255, 255, 255),
-        width=8,
-    )
+    draw.line((x + 17, y + 36, x + 30, y + 50), fill=(255, 255, 255), width=8)
+    draw.line((x + 30, y + 50, x + 53, y + 19), fill=(255, 255, 255), width=8)
 
 
 def _draw_clock(draw: ImageDraw.ImageDraw, x: int, y: int):
     green = (124, 255, 0)
 
-    draw.ellipse(
-        (x, y, x + 62, y + 62),
-        outline=green,
-        width=5,
-    )
-    draw.line(
-        (x + 31, y + 13, x + 31, y + 35),
-        fill=green,
-        width=4,
-    )
-    draw.line(
-        (x + 31, y + 35, x + 48, y + 46),
-        fill=green,
-        width=4,
-    )
+    draw.ellipse((x, y, x + 62, y + 62), outline=green, width=5)
+    draw.line((x + 31, y + 13, x + 31, y + 35), fill=green, width=4)
+    draw.line((x + 31, y + 35, x + 48, y + 46), fill=green, width=4)
 
 
 def _collect_plays(row: dict) -> list[dict]:
@@ -167,14 +133,11 @@ def _collect_plays(row: dict) -> list[dict]:
     def get_any(*names: str) -> str:
         for name in names:
             value = str(normalized.get(name.strip().lower(), "") or "").strip()
-
             if value:
                 return value
-
         return ""
 
     first_bet = get_any("bet")
-
     if first_bet:
         plays.append(
             {
@@ -185,13 +148,7 @@ def _collect_plays(row: dict) -> list[dict]:
         )
 
     for i in range(2, 8):
-        bet = get_any(
-            f"bet {i}",
-            f"bet{i}",
-            f"play {i}",
-            f"play{i}",
-        )
-
+        bet = get_any(f"bet {i}", f"bet{i}", f"play {i}", f"play{i}")
         if not bet:
             continue
 
@@ -237,10 +194,8 @@ def _play_label(play: dict) -> str:
 
 def _format_unit(unit: str) -> str:
     unit = str(unit or "").strip()
-
     if not unit:
         return ""
-
     return unit if unit.lower().endswith("u") else f"{unit}u"
 
 
@@ -254,12 +209,10 @@ def _generate_pick_card(row: dict) -> Path:
     play_count = len(plays)
 
     primary_unit = _format_unit(
-        plays[0].get("unit", "")
-        or _get_value(row, "Unit", "Units", fallback="")
+        plays[0].get("unit", "") or _get_value(row, "Unit", "Units", fallback="")
     )
 
     width, height = 1200, 1320
-
     green = (124, 255, 0)
     white = (245, 245, 245)
     dark = (5, 8, 9)
@@ -267,13 +220,12 @@ def _generate_pick_card(row: dict) -> Path:
     img = Image.new("RGBA", (width, height), (*dark, 255))
     draw = ImageDraw.Draw(img)
 
+    # Background texture
     for x in range(0, width, 22):
         for y in range(0, height, 22):
-            draw.ellipse(
-                (x, y, x + 2, y + 2),
-                fill=(25, 42, 36, 80),
-            )
+            draw.ellipse((x, y, x + 2, y + 2), fill=(25, 42, 36, 80))
 
+    # Outer card
     _rounded_rect(
         draw,
         (18, 16, width - 18, height - 16),
@@ -282,227 +234,93 @@ def _generate_pick_card(row: dict) -> Path:
         outline=(46, 58, 58),
         width=2,
     )
+    draw.rectangle((18, 16, 26, height - 16), fill=green)
 
-    draw.rectangle(
-        (18, 16, 26, height - 16),
-        fill=green,
-    )
+    # Top brand row inside the card
+    _paste_contain(img, AVATAR_PATH, (60, 48, 105, 93))
+    draw.text((128, 48), BRAND_NAME, font=_font(30, True), fill=white)
+    _paste_contain(img, AVATAR_PATH, (940, 48, 1090, 145))
 
-    _paste_contain(
-        img,
-        AVATAR_PATH,
-        (62, 42, 122, 102),
-    )
-
-    draw.text(
-        (148, 58),
-        BRAND_NAME,
-        font=_font(38, True),
-        fill=white,
-    )
-
-    bar = (58, 122, 1142, 246)
+    # Top time + matchup bar with inside logo preserved
+    bar = (58, 120, 930, 220)
 
     glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
-    gd.rounded_rectangle(
-        bar,
-        radius=22,
-        outline=green,
-        width=7,
-    )
-    glow = glow.filter(ImageFilter.GaussianBlur(7))
+    gd.rounded_rectangle(bar, radius=16, outline=green, width=5)
+    glow = glow.filter(ImageFilter.GaussianBlur(6))
     img.alpha_composite(glow)
 
-    _rounded_rect(
-        draw,
-        bar,
-        22,
-        fill=(8, 13, 14),
-        outline=green,
-        width=3,
-    )
+    _rounded_rect(draw, bar, 16, fill=(8, 13, 14), outline=green, width=2)
 
-    _draw_clock(draw, 88, 154)
+    _draw_clock(draw, 82, 138)
 
-    time_text, time_font = _fit_text(
-        draw,
-        est,
-        210,
-        48,
-        True,
-        34,
-    )
+    time_text, time_font = _fit_text(draw, est, 150, 34, True, 24)
+    draw.text((170, 134), time_text, font=time_font, fill=white)
+    draw.text((180, 176), "EST", font=_font(22, True), fill=green)
 
-    draw.text(
-        (178, 147),
-        time_text,
-        font=time_font,
-        fill=white,
-    )
-
-    draw.text(
-        (188, 203),
-        "EST",
-        font=_font(30, True),
-        fill=green,
-    )
-
-    draw.line(
-        (372, 145, 372, 222),
-        fill=(125, 138, 138),
-        width=2,
-    )
+    draw.line((300, 136, 300, 202), fill=(125, 138, 138), width=2)
 
     matchup = f"{player_1} vs {player_2}"
-
-    matchup_text, matchup_font = _fit_text(
-        draw,
-        matchup,
-        700,
-        39,
-        True,
-        27,
-    )
+    matchup_text, matchup_font = _fit_text(draw, matchup, 530, 27, True, 18)
 
     if " vs " in matchup_text and not matchup_text.endswith("..."):
         p1, p2 = matchup_text.split(" vs ", 1)
-
         p1_w = _text_width(draw, p1 + " ", matchup_font)
         vs_w = _text_width(draw, "vs ", matchup_font)
 
-        draw.text(
-            (420, 166),
-            p1 + " ",
-            font=matchup_font,
-            fill=white,
-        )
-        draw.text(
-            (420 + p1_w, 166),
-            "vs ",
-            font=matchup_font,
-            fill=green,
-        )
-        draw.text(
-            (420 + p1_w + vs_w, 166),
-            p2,
-            font=matchup_font,
-            fill=white,
-        )
+        draw.text((330, 151), p1 + " ", font=matchup_font, fill=white)
+        draw.text((330 + p1_w, 151), "vs ", font=matchup_font, fill=green)
+        draw.text((330 + p1_w + vs_w, 151), p2, font=matchup_font, fill=white)
     else:
-        draw.text(
-            (420, 166),
-            matchup_text,
-            font=matchup_font,
-            fill=white,
-        )
+        draw.text((330, 151), matchup_text, font=matchup_font, fill=white)
 
-    panel_top = 292
-    rows_top = 530
-    row_height = 106
-    row_gap = 10
-
+    # Dynamic panel sizing
+    panel_top = 270
+    rows_top = 455
+    row_height = 82
+    row_gap = 12
     rows_bottom = rows_top + play_count * (row_height + row_gap) - row_gap
-    unit_box_top = rows_bottom + 14
-    panel_bottom = unit_box_top + 44 + 10
+    unit_box_top = rows_bottom + 6
+    panel_bottom = unit_box_top + 36 + 10
 
     panel_box = (58, panel_top, 1142, panel_bottom)
 
     glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
-    gd.rounded_rectangle(
-        panel_box,
-        radius=28,
-        outline=green,
-        width=8,
-    )
-    glow = glow.filter(ImageFilter.GaussianBlur(10))
+    gd.rounded_rectangle(panel_box, radius=22, outline=green, width=6)
+    glow = glow.filter(ImageFilter.GaussianBlur(8))
     img.alpha_composite(glow)
 
-    _rounded_rect(
-        draw,
-        panel_box,
-        28,
-        fill=(6, 12, 13),
-        outline=green,
-        width=3,
-    )
+    _rounded_rect(draw, panel_box, 22, fill=(6, 12, 13), outline=green, width=2)
 
-    draw.rectangle(
-        (118, 340, 218, 415),
-        fill=(235, 235, 235),
-    )
-    draw.rectangle(
-        (118, 378, 218, 415),
-        fill=(235, 25, 45),
-    )
+    # League header
+    draw.rectangle((116, 320, 210, 390), fill=(235, 235, 235))
+    draw.rectangle((116, 355, 210, 390), fill=(235, 25, 45))
 
-    league_text, league_font = _fit_text(
-        draw,
-        league.upper(),
-        680,
-        52,
-        True,
-        34,
-    )
-
-    draw.text(
-        (260, 354),
-        league_text,
-        font=league_font,
-        fill=white,
-    )
-
-    draw.line(
-        (250, 430, 772, 430),
-        fill=green,
-        width=4,
-    )
-    draw.line(
-        (772, 430, 832, 390),
-        fill=green,
-        width=4,
-    )
+    league_text, league_font = _fit_text(draw, league.upper(), 650, 46, True, 30)
+    draw.text((252, 330), league_text, font=league_font, fill=white)
+    draw.line((250, 420, 680, 420), fill=green, width=3)
+    draw.line((680, 420, 730, 385), fill=green, width=3)
 
     play_word = "play" if play_count == 1 else "plays"
-
-    draw.text(
-        (118, 460),
-        f"{play_count} {play_word}",
-        font=_font(36, True),
-        fill=green,
-    )
+    draw.text((116, 445), f"{play_count} {play_word}", font=_font(30, True), fill=green)
 
     def play_row(y: int, label: str):
         _rounded_rect(
             draw,
-            (112, y, 1072, y + row_height),
-            16,
+            (106, y, 1058, y + row_height),
+            10,
             fill=(10, 15, 16),
             outline=(48, 60, 60),
-            width=2,
+            width=1,
         )
 
-        _draw_check(draw, 142, y + 19)
+        _draw_check(draw, 138, y + 8)
 
-        fitted_label, fitted_font = _fit_text(
-            draw,
-            label,
-            760,
-            42,
-            True,
-            30,
-        )
-
-        draw.text(
-            (260, y + 32),
-            fitted_label,
-            font=fitted_font,
-            fill=white,
-        )
+        fitted_label, fitted_font = _fit_text(draw, label, 740, 30, True, 20)
+        draw.text((250, y + 23), fitted_label, font=fitted_font, fill=white)
 
     current_y = rows_top
-
     for play in plays:
         play_row(current_y, _play_label(play))
         current_y += row_height + row_gap
@@ -510,76 +328,38 @@ def _generate_pick_card(row: dict) -> Path:
     if primary_unit:
         _rounded_rect(
             draw,
-            (102, unit_box_top, 212, unit_box_top + 44),
-            6,
+            (96, unit_box_top, 190, unit_box_top + 30),
+            4,
             fill=(11, 20, 16),
             outline=green,
             width=2,
         )
+        draw.text((116, unit_box_top + 2), primary_unit, font=_font(22, True), fill=green)
 
-        draw.text(
-            (124, unit_box_top + 4),
-            primary_unit,
-            font=_font(30, True),
-            fill=green,
-        )
+    banner_top = panel_bottom + 18
+    _paste_contain(img, BANNER_PATH, (80, banner_top, 1082, banner_top + 240))
 
-    banner_top = panel_bottom + 28
-
-    _paste_contain(
-        img,
-        BANNER_PATH,
-        (58, banner_top, 1142, banner_top + 300),
-    )
-
-    footer_y = height - 68
-
-    draw.line(
-        (118, footer_y - 6, 1082, footer_y - 6),
-        fill=(42, 55, 55),
-        width=1,
-    )
-
-    _paste_contain(
-        img,
-        AVATAR_PATH,
-        (60, footer_y, 104, footer_y + 44),
-    )
-
-    draw.text(
-        (122, footer_y + 4),
-        BRAND_NAME,
-        font=_font(28, True),
-        fill=white,
-    )
+    # Footer inside generated card
+    footer_y = height - 64
+    draw.line((110, footer_y - 10, 1088, footer_y - 10), fill=(42, 55, 55), width=1)
+    _paste_contain(img, AVATAR_PATH, (70, footer_y, 104, footer_y + 34))
+    draw.text((126, footer_y + 2), BRAND_NAME, font=_font(22, True), fill=white)
 
     img = img.convert("RGB")
     img.save(GENERATED_CARD_PATH, quality=95)
-
     return GENERATED_CARD_PATH
 
 
 def _build_embed_payload(card_file_name: str, avatar_file_name: str | None = None) -> dict:
     embed = {
         "color": DISCORD_EMBED_COLOR,
-        "image": {
-            "url": f"attachment://{card_file_name}",
-        },
-        "footer": {
-            "text": BRAND_NAME,
-        },
+        "image": {"url": f"attachment://{card_file_name}"},
+        "footer": {"text": BRAND_NAME},
     }
 
+    # No author, no title, no thumbnail, no top text
     if avatar_file_name:
         avatar_url = f"attachment://{avatar_file_name}"
-
-        embed["author"] = {
-            "name": BRAND_NAME,
-            "icon_url": avatar_url,
-        }
-        embed["thumbnail"] = {
-            "url": avatar_url,
-        }
         embed["footer"]["icon_url"] = avatar_url
 
     return {
@@ -601,36 +381,16 @@ def _post_card_to_discord(webhook_url: str, card_path: Path) -> requests.Respons
     try:
         card_file = card_path.open("rb")
         open_files.append(card_file)
-        files.append(
-            (
-                "files[0]",
-                (
-                    card_path.name,
-                    card_file,
-                    "image/png",
-                ),
-            )
-        )
+        files.append(("files[0]", (card_path.name, card_file, "image/png")))
 
         if AVATAR_PATH.exists():
             avatar_file = AVATAR_PATH.open("rb")
             open_files.append(avatar_file)
-            files.append(
-                (
-                    "files[1]",
-                    (
-                        AVATAR_PATH.name,
-                        avatar_file,
-                        "image/png",
-                    ),
-                )
-            )
+            files.append(("files[1]", (AVATAR_PATH.name, avatar_file, "image/png")))
 
         return requests.post(
             webhook_url,
-            data={
-                "payload_json": json.dumps(payload),
-            },
+            data={"payload_json": json.dumps(payload)},
             files=files,
             timeout=30,
         )
@@ -663,10 +423,7 @@ def run_automation():
         return
 
     if not sheet_id or sheet_id == "YOUR_SHEET_ID_HERE":
-        print(
-            "❌ Error: Missing Google Sheet ID. "
-            "Set GOOGLE_SHEET_ID in GitHub Secrets or edit DEFAULT_SHEET_ID."
-        )
+        print("❌ Error: Missing Google Sheet ID. Set GOOGLE_SHEET_ID in GitHub Secrets or edit DEFAULT_SHEET_ID.")
         return
 
     scopes = [
