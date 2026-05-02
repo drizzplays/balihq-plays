@@ -33,7 +33,7 @@ EST_TZ = ZoneInfo("America/New_York")
 
 # Bot posts during this window:
 # game time - 5 minutes through game time.
-POST_WINDOW_MINUTES = 5
+POST_WINDOW_MINUTES = 8
 
 
 def _normalize_header(header: str) -> str:
