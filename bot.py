@@ -19,6 +19,11 @@ BRAND_NAME = "BALIHQBETS"
 DEFAULT_SHEET_ID = "YOUR_SHEET_ID_HERE"
 
 
+def _clean(value, fallback="N/A"):
+    value = str(value or "").strip()
+    return value if value else fallback
+
+
 def _get_value(row: dict, *keys: str, fallback: str = "N/A") -> str:
     """Read a sheet value while tolerating small header-name differences."""
     normalized = {str(k).strip().lower(): v for k, v in row.items()}
@@ -34,13 +39,8 @@ def _get_value(row: dict, *keys: str, fallback: str = "N/A") -> str:
 
 def _format_unit(unit: str) -> str:
     if unit == "N/A":
-        return "Unit: N/A"
-
-    clean_unit = unit.strip()
-    if clean_unit.lower().endswith("u"):
-        return clean_unit
-
-    return f"{clean_unit}u"
+        return unit
+    return unit if unit.lower().endswith("u") else f"{unit}u"
 
 
 def _build_embed_payload(row: dict, avatar_file_name: str | None = None, banner_file_name: str | None = None) -> dict:
@@ -54,35 +54,51 @@ def _build_embed_payload(row: dict, avatar_file_name: str | None = None, banner_
     unit = _get_value(row, "Unit", "Units")
     history = _get_value(row, "History", "Unit History")
 
-    time_line_parts = []
+    time_parts = []
     if est != "N/A":
-        time_line_parts.append(f"{est} EST")
+        time_parts.append(f"{est} EST")
     if mtn != "N/A":
-        time_line_parts.append(f"{mtn} MTN")
+        time_parts.append(f"{mtn} MTN")
     if pst != "N/A":
-        time_line_parts.append(f"{pst} PST")
+        time_parts.append(f"{pst} PST")
 
-    time_line = " | ".join(time_line_parts) if time_line_parts else "N/A"
-    unit_text = _format_unit(unit)
+    time_text = " | ".join(time_parts) if time_parts else "N/A"
 
-    bet_line = f"✅ **{bet}**"
+    play_text = f"✅ **{bet}**"
     if history != "N/A":
-        bet_line += f" • {history} L20"
+        play_text += f" • {history} L20"
+    if unit != "N/A":
+        play_text += f"\n**Unit:** {_format_unit(unit)}"
 
     embed: dict = {
         "color": DISCORD_EMBED_COLOR,
         "author": {
             "name": f"🌴 {BRAND_NAME}",
         },
-        "description": (
-            f"## 🕒 {time_line}\n"
-            f"### {player_1} `vs` {player_2}\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"### {league}\n"
-            f"*1 play*\n\n"
-            f"{bet_line}\n"
-            f"`{unit_text}`"
-        ),
+        "title": f"🏆 NEW {league} ALERT 🏆",
+        "description": "━━━━━━━━━━━━━━━━━━━━",
+        "fields": [
+            {
+                "name": "⏰ Time",
+                "value": time_text,
+                "inline": False,
+            },
+            {
+                "name": "👥 Matchup",
+                "value": f"**{player_1}** vs **{player_2}**",
+                "inline": False,
+            },
+            {
+                "name": f"🏓 {league}",
+                "value": "*1 play*",
+                "inline": False,
+            },
+            {
+                "name": "🔥 Play",
+                "value": play_text,
+                "inline": False,
+            },
+        ],
         "footer": {
             "text": f"🌴 {BRAND_NAME}",
         },
