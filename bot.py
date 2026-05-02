@@ -409,7 +409,6 @@ def _generate_pick_card(row: dict) -> Path:
     # header
     header = (left, header_y, right, header_y + header_h)
     _rounded_rect(draw, header, 24, fill=(11, 18, 21), outline=(42, 58, 65), width=1)
-    draw.rectangle((header[0], header[1] + 18, header[2], header[1] + 21), fill=green_glow)
 
     _paste_circle(img, AVATAR_PATH, (header[0] + 16, header_y + 17, header[0] + 70, header_y + 71), border_color=green, border=3)
     draw.text((header[0] + 84, header_y + 11), BRAND_NAME, font=_font(32, True), fill=white)
@@ -417,6 +416,12 @@ def _generate_pick_card(row: dict) -> Path:
     draw.text((header[0] + 192, header_y + 50), "AUTO POSTED PLAY", font=_font(17, True), fill=muted)
 
     logo_badge = (right - 170, header_y + 10, right - 18, header_y + 82)
+    # cleaner top accent line: keep it away from the avatar/text on the left and logo badge on the right
+    accent_y1 = header[1] + 18
+    accent_y2 = accent_y1 + 4
+    accent_x1 = header[0] + 62
+    accent_x2 = logo_badge[0] - 18
+    draw.rounded_rectangle((accent_x1, accent_y1, accent_x2, accent_y2), radius=2, fill=(110, 240, 0, 170))
     _rounded_rect(draw, logo_badge, 20, fill=(12, 20, 23), outline=(44, 60, 67), width=1)
     _paste_contain(img, AVATAR_PATH, (logo_badge[0] + 28, logo_badge[1] + 9, logo_badge[2] - 28, logo_badge[3] - 9))
 
