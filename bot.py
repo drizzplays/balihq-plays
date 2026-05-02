@@ -12,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent
 IMAGES_DIR = BASE_DIR / "images"
 AVATAR_PATH = IMAGES_DIR / "avatar.png"
 BANNER_PATH = IMAGES_DIR / "banner.png"
-BRAND_NAME = "SHEETWAGERS"
+BRAND_NAME = "🌴BALIHQBETS"
 
 
 # Replace this with your real Google Sheet ID or set GOOGLE_SHEET_ID in GitHub Secrets.
