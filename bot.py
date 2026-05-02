@@ -38,8 +38,10 @@ def _get_value(row: dict, *keys: str, fallback: str = "N/A") -> str:
 
 def _font(size: int, bold: bool = False):
     font_paths = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
+        if bold else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
     ]
     for path in font_paths:
         if Path(path).exists():
@@ -52,8 +54,16 @@ def _text_width(draw: ImageDraw.ImageDraw, text: str, font) -> int:
     return box[2] - box[0]
 
 
-def _fit_text(draw: ImageDraw.ImageDraw, text: str, max_width: int, size: int, bold: bool = True, min_size: int = 24):
+def _fit_text(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    max_width: int,
+    size: int,
+    bold: bool = True,
+    min_size: int = 24,
+):
     text = str(text)
+
     for font_size in range(size, min_size - 1, -2):
         font = _font(font_size, bold)
         if _text_width(draw, text, font) <= max_width:
@@ -63,6 +73,7 @@ def _fit_text(draw: ImageDraw.ImageDraw, text: str, max_width: int, size: int, b
     ellipsis = "..."
     while len(text) > 3 and _text_width(draw, text + ellipsis, font) > max_width:
         text = text[:-1]
+
     return text + ellipsis, font
 
 
@@ -73,10 +84,12 @@ def _rounded_rect(draw: ImageDraw.ImageDraw, box, radius, fill, outline=None, wi
 def _paste_contain(canvas: Image.Image, image_path: Path, box: tuple[int, int, int, int]):
     if not image_path.exists():
         return
+
     img = Image.open(image_path).convert("RGBA")
     target_w = box[2] - box[0]
     target_h = box[3] - box[1]
     img.thumbnail((target_w, target_h), Image.LANCZOS)
+
     x = box[0] + (target_w - img.width) // 2
     y = box[1] + (target_h - img.height) // 2
     canvas.alpha_composite(img, (x, y))
@@ -84,7 +97,14 @@ def _paste_contain(canvas: Image.Image, image_path: Path, box: tuple[int, int, i
 
 def _draw_check(draw: ImageDraw.ImageDraw, x: int, y: int):
     green = (124, 255, 0)
-    _rounded_rect(draw, (x, y, x + 68, y + 68), 12, fill=green, outline=(175, 255, 120), width=2)
+    _rounded_rect(
+        draw,
+        (x, y, x + 68, y + 68),
+        12,
+        fill=green,
+        outline=(175, 255, 120),
+        width=2,
+    )
     draw.line((x + 17, y + 36, x + 30, y + 50), fill=(255, 255, 255), width=8)
     draw.line((x + 30, y + 50, x + 53, y + 19), fill=(255, 255, 255), width=8)
 
@@ -107,6 +127,7 @@ def _collect_plays(row: dict) -> list[dict]:
                 return value
         return ""
 
+    # First play
     first_bet = get_any("bet")
     if first_bet:
         plays.append(
@@ -117,22 +138,38 @@ def _collect_plays(row: dict) -> list[dict]:
             }
         )
 
-    # Extra plays are optional. If only one BET column exists, only one play displays.
-    # Add columns like BET 2 / HISTORY 2 / UNIT 2 for more plays.
+    # Additional plays if you have BET 2 / HISTORY 2 / UNIT 2, etc.
     for i in range(2, 8):
         bet = get_any(f"bet {i}", f"bet{i}", f"play {i}", f"play{i}")
         if not bet:
             continue
+
         plays.append(
             {
                 "bet": bet,
-                "history": get_any(f"history {i}", f"history{i}", f"unit history {i}", f"unit history{i}"),
-                "unit": get_any(f"unit {i}", f"unit{i}", f"units {i}", f"units{i}"),
+                "history": get_any(
+                    f"history {i}",
+                    f"history{i}",
+                    f"unit history {i}",
+                    f"unit history{i}",
+                ),
+                "unit": get_any(
+                    f"unit {i}",
+                    f"unit{i}",
+                    f"units {i}",
+                    f"units{i}",
+                ),
             }
         )
 
     if not plays:
-        plays.append({"bet": "No Bet Found", "history": "", "unit": get_any("unit", "units")})
+        plays.append(
+            {
+                "bet": "No Bet Found",
+                "history": "",
+                "unit": get_any("unit", "units"),
+            }
+        )
 
     return plays
 
@@ -140,8 +177,10 @@ def _collect_plays(row: dict) -> list[dict]:
 def _play_label(play: dict) -> str:
     label = play.get("bet", "") or "No Bet Found"
     history = str(play.get("history", "") or "").strip()
+
     if history:
         label += f"  •  {history} L20"
+
     return label
 
 
@@ -159,7 +198,9 @@ def _generate_pick_card(row: dict) -> Path:
     player_2 = _get_value(row, "Player 2", "Player2", fallback="TBD")
     plays = _collect_plays(row)
     play_count = len(plays)
-    primary_unit = _format_unit(plays[0].get("unit", "") or _get_value(row, "Unit", "Units", fallback=""))
+    primary_unit = _format_unit(
+        plays[0].get("unit", "") or _get_value(row, "Unit", "Units", fallback="")
+    )
 
     width, height = 1200, 1320
     green = (124, 255, 0)
@@ -169,24 +210,34 @@ def _generate_pick_card(row: dict) -> Path:
     img = Image.new("RGBA", (width, height), (*dark, 255))
     draw = ImageDraw.Draw(img)
 
+    # background texture
     for x in range(0, width, 22):
         for y in range(0, height, 22):
             draw.ellipse((x, y, x + 2, y + 2), fill=(25, 42, 36, 80))
 
-    _rounded_rect(draw, (18, 16, width - 18, height - 16), 18, fill=(8, 12, 13), outline=(46, 58, 58), width=2)
+    # outer card
+    _rounded_rect(
+        draw,
+        (18, 16, width - 18, height - 16),
+        18,
+        fill=(8, 12, 13),
+        outline=(46, 58, 58),
+        width=2,
+    )
     draw.rectangle((18, 16, 26, height - 16), fill=green)
 
-    # Brand row. Large right-side logo removed so it does not block the matchup.
+    # brand row - no big blocking logo
     _paste_contain(img, AVATAR_PATH, (62, 42, 122, 102))
     draw.text((148, 58), BRAND_NAME, font=_font(38, True), fill=white)
 
-    # Full-width top bar.
+    # top bar
     bar = (58, 122, 1142, 246)
     glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
     gd.rounded_rectangle(bar, radius=22, outline=green, width=7)
     glow = glow.filter(ImageFilter.GaussianBlur(7))
     img.alpha_composite(glow)
+
     _rounded_rect(draw, bar, 22, fill=(8, 13, 14), outline=green, width=3)
 
     _draw_clock(draw, 88, 154)
@@ -197,17 +248,19 @@ def _generate_pick_card(row: dict) -> Path:
 
     matchup = f"{player_1} vs {player_2}"
     matchup_text, matchup_font = _fit_text(draw, matchup, 700, 39, True, 27)
+
     if " vs " in matchup_text and not matchup_text.endswith("..."):
         p1, p2 = matchup_text.split(" vs ", 1)
         p1_w = _text_width(draw, p1 + " ", matchup_font)
         vs_w = _text_width(draw, "vs ", matchup_font)
+
         draw.text((420, 166), p1 + " ", font=matchup_font, fill=white)
         draw.text((420 + p1_w, 166), "vs ", font=matchup_font, fill=green)
         draw.text((420 + p1_w + vs_w, 166), p2, font=matchup_font, fill=white)
     else:
         draw.text((420, 166), matchup_text, font=matchup_font, fill=white)
 
-    # Dynamic panel height based on actual number of plays.
+    # dynamic play panel
     panel_top = 292
     rows_top = 530
     row_height = 106
@@ -222,10 +275,13 @@ def _generate_pick_card(row: dict) -> Path:
     gd.rounded_rectangle(panel_box, radius=28, outline=green, width=8)
     glow = glow.filter(ImageFilter.GaussianBlur(10))
     img.alpha_composite(glow)
+
     _rounded_rect(draw, panel_box, 28, fill=(6, 12, 13), outline=green, width=3)
 
+    # league
     draw.rectangle((118, 340, 218, 415), fill=(235, 235, 235))
     draw.rectangle((118, 378, 218, 415), fill=(235, 25, 45))
+
     league_text, league_font = _fit_text(draw, league.upper(), 680, 52, True, 34)
     draw.text((260, 354), league_text, font=league_font, fill=white)
     draw.line((250, 430, 772, 430), fill=green, width=4)
@@ -235,7 +291,14 @@ def _generate_pick_card(row: dict) -> Path:
     draw.text((118, 460), f"{play_count} {play_word}", font=_font(36, True), fill=green)
 
     def play_row(y: int, label: str):
-        _rounded_rect(draw, (112, y, 1072, y + row_height), 16, fill=(10, 15, 16), outline=(48, 60, 60), width=2)
+        _rounded_rect(
+            draw,
+            (112, y, 1072, y + row_height),
+            16,
+            fill=(10, 15, 16),
+            outline=(48, 60, 60),
+            width=2,
+        )
         _draw_check(draw, 142, y + 19)
         fitted_label, fitted_font = _fit_text(draw, label, 760, 42, True, 30)
         draw.text((260, y + 32), fitted_label, font=fitted_font, fill=white)
@@ -246,7 +309,14 @@ def _generate_pick_card(row: dict) -> Path:
         current_y += row_height + row_gap
 
     if primary_unit:
-        _rounded_rect(draw, (102, unit_box_top, 212, unit_box_top + 44), 6, fill=(11, 20, 16), outline=green, width=2)
+        _rounded_rect(
+            draw,
+            (102, unit_box_top, 212, unit_box_top + 44),
+            6,
+            fill=(11, 20, 16),
+            outline=green,
+            width=2,
+        )
         draw.text((124, unit_box_top + 4), primary_unit, font=_font(30, True), fill=green)
 
     banner_top = panel_bottom + 28
@@ -265,7 +335,7 @@ def _generate_pick_card(row: dict) -> Path:
 def _build_embed_payload(card_file_name: str, avatar_file_name: str | None = None) -> dict:
     embed = {
         "color": DISCORD_EMBED_COLOR,
-        "title": "📢 PROP TYPE",
+        "title": "📢 BET ALERT",
         "image": {"url": f"attachment://{card_file_name}"},
         "footer": {"text": BRAND_NAME},
     }
@@ -276,7 +346,10 @@ def _build_embed_payload(card_file_name: str, avatar_file_name: str | None = Non
         embed["thumbnail"] = {"url": avatar_url}
         embed["footer"]["icon_url"] = avatar_url
 
-    return {"content": "", "embeds": [embed]}
+    return {
+        "content": "",
+        "embeds": [embed],
+    }
 
 
 def _post_card_to_discord(webhook_url: str, card_path: Path) -> requests.Response:
@@ -285,6 +358,7 @@ def _post_card_to_discord(webhook_url: str, card_path: Path) -> requests.Respons
 
     open_files = []
     files = []
+
     try:
         card_file = card_path.open("rb")
         open_files.append(card_file)
@@ -310,9 +384,11 @@ def _get_latest_row(sheet) -> dict | None:
     records = sheet.get_all_records()
     if not records:
         return None
+
     for row in reversed(records):
         if any(str(value or "").strip() for value in row.values()):
             return row
+
     return None
 
 
@@ -324,6 +400,7 @@ def run_automation():
     if not creds_json or not webhook_url:
         print("❌ Error: Missing Environment Variables")
         return
+
     if not sheet_id or sheet_id == "YOUR_SHEET_ID_HERE":
         print("❌ Error: Missing Google Sheet ID. Set GOOGLE_SHEET_ID in GitHub Secrets or edit DEFAULT_SHEET_ID.")
         return
@@ -340,6 +417,7 @@ def run_automation():
     try:
         sheet = client.open_by_key(sheet_id).sheet1
         row = _get_latest_row(sheet)
+
         if not row:
             print("⚠️ Sheet is empty.")
             return
