@@ -1,16 +1,16 @@
-name: Sheet-to-Webhook Automation
+name: BaliHQ Play Poster
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch: # Allows you to run it manually
+  workflow_dispatch: # Use this to manually trigger a post from the Actions tab
 
 jobs:
-  update-sheets:
+  post-latest-play:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -23,10 +23,8 @@ jobs:
         run: |
           pip install gspread google-auth requests
 
-      - name: Run Update Script
+      - name: Execute Post
         env:
-          # Paste your entire Google JSON key into this Secret
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          # Your Discord Webhook URL
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python bot.py
