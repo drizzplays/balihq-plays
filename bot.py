@@ -353,164 +353,162 @@ def _generate_pick_card(row: dict) -> Path:
 
     width = 1200
     outer_pad = 24
-    card_left = outer_pad + 20
-    card_right = width - outer_pad - 20
+    left = outer_pad + 18
+    right = width - outer_pad - 18
+
+    green = (124, 255, 0)
+    green_glow = (124, 255, 0, 56)
+    white = (246, 247, 248)
+    off_white = (204, 210, 214)
+    muted = (104, 117, 126)
+    bg_top = (5, 9, 12)
+    bg_bottom = (8, 16, 19)
+    shell_fill = (8, 12, 15)
+    panel_fill = (10, 15, 18)
+    row_fill = (13, 20, 24)
+    stroke = (39, 54, 60)
+    soft_stroke = (28, 41, 47)
 
     header_y = 38
-    header_h = 98
+    header_h = 92
     matchup_y = header_y + header_h + 18
-    matchup_h = 96
-    board_y = matchup_y + matchup_h + 22
+    matchup_h = 94
+    board_y = matchup_y + matchup_h + 24
 
-    row_h = 84
+    chip_h = 42
+    rows_top = board_y + 104
+    row_h = 82
     row_gap = 14
-    header_area_h = 118
-    banner_h = 214
-
     rows_h = play_count * row_h + max(0, play_count - 1) * row_gap
-    rows_y = board_y + header_area_h
-    banner_y = rows_y + rows_h + 32
+    banner_y = rows_top + rows_h + 26
+    banner_h = 212
     board_bottom = banner_y + banner_h + 24
     total_h = board_bottom + 42
 
-    green = (124, 255, 0)
-    green_soft = (124, 255, 0, 55)
-    white = (247, 248, 249)
-    off_white = (202, 209, 214)
-    muted = (104, 117, 126)
-    bg_1 = (6, 9, 12)
-    bg_2 = (8, 16, 19)
-    card_fill = (8, 12, 15)
-    panel_fill = (9, 15, 18)
-    row_fill = (13, 20, 24)
-    stroke = (39, 54, 60)
-
-    img = Image.new("RGBA", (width, total_h), bg_1 + (255,))
+    img = Image.new("RGBA", (width, total_h), bg_top + (255,))
     draw = ImageDraw.Draw(img)
 
+    # background
     for y in range(total_h):
         t = y / max(1, total_h - 1)
-        r = int(bg_1[0] * (1 - t) + bg_2[0] * t)
-        g = int(bg_1[1] * (1 - t) + bg_2[1] * t)
-        b = int(bg_1[2] * (1 - t) + bg_2[2] * t)
+        r = int(bg_top[0] * (1 - t) + bg_bottom[0] * t)
+        g = int(bg_top[1] * (1 - t) + bg_bottom[1] * t)
+        b = int(bg_top[2] * (1 - t) + bg_bottom[2] * t)
         draw.line((0, y, width, y), fill=(r, g, b, 255))
-
     for x in range(-200, width + 220, 120):
-        draw.line((x, 0, x + 260, total_h), fill=(18, 32, 37, 32), width=2)
-    for x in range(0, width, 24):
-        for y in range(0, total_h, 24):
-            draw.ellipse((x, y, x + 2, y + 2), fill=(20, 34, 38, 68))
+        draw.line((x, 0, x + 250, total_h), fill=(18, 30, 34, 28), width=2)
+    for x in range(0, width, 26):
+        for y in range(0, total_h, 26):
+            draw.ellipse((x, y, x + 2, y + 2), fill=(20, 34, 38, 66))
 
-    outer = (outer_pad, 18, width - outer_pad, total_h - 18)
-    _draw_soft_glow(img, outer, radius=30, color=(124, 255, 0, 50), border=6)
-    _rounded_rect(draw, outer, 30, fill=card_fill, outline=(46, 62, 70), width=2)
+    shell = (outer_pad, 18, width - outer_pad, total_h - 18)
+    _draw_soft_glow(img, shell, radius=30, color=(124, 255, 0, 48), border=6)
+    _rounded_rect(draw, shell, 30, fill=shell_fill, outline=(46, 62, 70), width=2)
     _rounded_rect(draw, (outer_pad + 10, 28, width - outer_pad - 10, total_h - 28), 26, fill=None, outline=(15, 25, 30), width=1)
 
-    # Header
-    header_box = (card_left, header_y, card_right, header_y + header_h)
-    _rounded_rect(draw, header_box, 24, fill=(11, 18, 21), outline=(42, 58, 65), width=1)
-    draw.rectangle((header_box[0], header_box[1] + 20, header_box[2], header_box[1] + 23), fill=green_soft)
+    # header
+    header = (left, header_y, right, header_y + header_h)
+    _rounded_rect(draw, header, 24, fill=(11, 18, 21), outline=(42, 58, 65), width=1)
+    draw.rectangle((header[0], header[1] + 18, header[2], header[1] + 21), fill=green_glow)
 
-    _paste_circle(img, AVATAR_PATH, (header_box[0] + 14, header_y + 14, header_box[0] + 74, header_y + 74), border_color=green, border=3)
-    draw.text((header_box[0] + 90, header_y + 12), BRAND_NAME, font=_font(34, True), fill=white)
-    draw.text((header_box[0] + 92, header_y + 55), "BET ALERT", font=_font(18, True), fill=green)
-    draw.text((header_box[0] + 208, header_y + 55), "AUTO POSTED PLAY", font=_font(18, True), fill=muted)
+    _paste_circle(img, AVATAR_PATH, (header[0] + 16, header_y + 17, header[0] + 70, header_y + 71), border_color=green, border=3)
+    draw.text((header[0] + 84, header_y + 11), BRAND_NAME, font=_font(32, True), fill=white)
+    draw.text((header[0] + 86, header_y + 50), "BET ALERT", font=_font(17, True), fill=green)
+    draw.text((header[0] + 192, header_y + 50), "AUTO POSTED PLAY", font=_font(17, True), fill=muted)
 
-    logo_box = (card_right - 170, header_y + 10, card_right - 18, header_y + 86)
-    _rounded_rect(draw, logo_box, 20, fill=(12, 20, 23), outline=(44, 60, 67), width=1)
-    _paste_contain(img, AVATAR_PATH, (logo_box[0] + 24, logo_box[1] + 8, logo_box[2] - 24, logo_box[3] - 8))
+    logo_badge = (right - 170, header_y + 10, right - 18, header_y + 82)
+    _rounded_rect(draw, logo_badge, 20, fill=(12, 20, 23), outline=(44, 60, 67), width=1)
+    _paste_contain(img, AVATAR_PATH, (logo_badge[0] + 28, logo_badge[1] + 9, logo_badge[2] - 28, logo_badge[3] - 9))
 
-    # Matchup band (single clean strip, no duplicate side logo)
-    matchup_box = (card_left + 20, matchup_y, card_right - 20, matchup_y + matchup_h)
-    _draw_soft_glow(img, matchup_box, radius=24, color=(124, 255, 0, 60), border=4)
+    # matchup bar
+    matchup_box = (left + 18, matchup_y, right - 18, matchup_y + matchup_h)
+    _draw_soft_glow(img, matchup_box, radius=24, color=(124, 255, 0, 58), border=4)
     _rounded_rect(draw, matchup_box, 24, fill=(8, 14, 16), outline=green, width=2)
 
-    time_chip = (matchup_box[0] + 18, matchup_y + 14, matchup_box[0] + 164, matchup_y + 82)
+    time_chip = (matchup_box[0] + 18, matchup_y + 14, matchup_box[0] + 168, matchup_y + 80)
     _rounded_rect(draw, time_chip, 18, fill=(13, 23, 18), outline=(72, 118, 74), width=1)
-    _draw_clock(draw, time_chip[0] + 16, time_chip[1] + 11)
-    time_text, time_font = _fit_text(draw, est, 86, 26, True, 16)
-    draw.text((time_chip[0] + 58, time_chip[1] + 8), time_text, font=time_font, fill=white)
-    draw.text((time_chip[0] + 58, time_chip[1] + 36), "EST", font=_font(17, True), fill=green)
+    _draw_clock(draw, time_chip[0] + 14, time_chip[1] + 10)
+    time_text, time_font = _fit_text(draw, est, 86, 25, True, 16)
+    draw.text((time_chip[0] + 56, time_chip[1] + 7), time_text, font=time_font, fill=white)
+    draw.text((time_chip[0] + 56, time_chip[1] + 34), "EST", font=_font(16, True), fill=green)
 
     divider_x = time_chip[2] + 28
     draw.line((divider_x, matchup_y + 18, divider_x, matchup_y + matchup_h - 18), fill=(56, 74, 81), width=2)
-    draw.text((divider_x + 24, matchup_y + 12), "MATCHUP", font=_font(16, True), fill=muted)
+    draw.text((divider_x + 24, matchup_y + 12), "MATCHUP", font=_font(15, True), fill=muted)
 
     matchup = f"{player_1} vs {player_2}"
-    available_w = matchup_box[2] - (divider_x + 24) - 28
-    matchup_text, matchup_font = _fit_text(draw, matchup, available_w, 28, True, 17)
-    base_x = divider_x + 24
-    base_y = matchup_y + 42
+    matchup_text, matchup_font = _fit_text(draw, matchup, matchup_box[2] - (divider_x + 24) - 28, 27, True, 17)
+    tx = divider_x + 24
+    ty = matchup_y + 41
     if " vs " in matchup_text and not matchup_text.endswith("..."):
         p1, p2 = matchup_text.split(" vs ", 1)
         p1_w = _text_width(draw, p1 + " ", matchup_font)
         vs_w = _text_width(draw, "vs ", matchup_font)
-        draw.text((base_x, base_y), p1 + " ", font=matchup_font, fill=white)
-        draw.text((base_x + p1_w, base_y), "vs ", font=matchup_font, fill=green)
-        draw.text((base_x + p1_w + vs_w, base_y), p2, font=matchup_font, fill=white)
+        draw.text((tx, ty), p1 + " ", font=matchup_font, fill=white)
+        draw.text((tx + p1_w, ty), "vs ", font=matchup_font, fill=green)
+        draw.text((tx + p1_w + vs_w, ty), p2, font=matchup_font, fill=white)
     else:
-        draw.text((base_x, base_y), matchup_text, font=matchup_font, fill=white)
+        draw.text((tx, ty), matchup_text, font=matchup_font, fill=white)
 
-    # Main board
-    board = (card_left + 20, board_y, card_right - 20, board_bottom)
-    _draw_soft_glow(img, board, radius=28, color=(124, 255, 0, 58), border=5)
+    # board
+    board = (left + 18, board_y, right - 18, board_bottom)
+    _draw_soft_glow(img, board, radius=28, color=(124, 255, 0, 56), border=5)
     _rounded_rect(draw, board, 28, fill=panel_fill, outline=(54, 72, 79), width=1)
 
     chip_y = board_y + 22
-    league_chip = (board[0] + 22, chip_y, board[0] + 288, chip_y + 44)
+    league_chip = (board[0] + 22, chip_y, board[0] + 292, chip_y + chip_h)
     _rounded_rect(draw, league_chip, 16, fill=(14, 22, 26), outline=(54, 73, 80), width=1)
-    league_text, league_font = _fit_text(draw, league.upper(), 220, 24, True, 15)
-    draw.text((league_chip[0] + 18, chip_y + 10), league_text, font=league_font, fill=white)
+    league_text, league_font = _fit_text(draw, league.upper(), 220, 23, True, 15)
+    draw.text((league_chip[0] + 16, chip_y + 10), league_text, font=league_font, fill=white)
 
-    count_chip = (league_chip[2] + 18, chip_y, league_chip[2] + 164, chip_y + 44)
+    count_chip = (league_chip[2] + 18, chip_y, league_chip[2] + 176, chip_y + chip_h)
     _rounded_rect(draw, count_chip, 16, fill=(13, 24, 17), outline=(74, 121, 78), width=1)
     play_word = "PLAY" if play_count == 1 else "PLAYS"
-    draw.text((count_chip[0] + 18, chip_y + 10), f"{play_count} {play_word}", font=_font(18, True), fill=green)
+    draw.text((count_chip[0] + 16, chip_y + 10), f"{play_count} {play_word}", font=_font(18, True), fill=green)
 
     if primary_unit:
-        unit_chip = (board[2] - 152, chip_y, board[2] - 22, chip_y + 44)
+        unit_chip = (board[2] - 156, chip_y, board[2] - 22, chip_y + chip_h)
         _rounded_rect(draw, unit_chip, 16, fill=(13, 24, 17), outline=(74, 121, 78), width=1)
         unit_label = f"UNIT {primary_unit}"
         unit_w = _text_width(draw, unit_label, _font(18, True))
-        draw.text((unit_chip[0] + ((unit_chip[2]-unit_chip[0])-unit_w)/2, chip_y + 10), unit_label, font=_font(18, True), fill=green)
+        draw.text((unit_chip[0] + ((unit_chip[2] - unit_chip[0]) - unit_w) / 2, chip_y + 10), unit_label, font=_font(18, True), fill=green)
 
-    divider_y = board_y + 82
-    draw.line((board[0] + 22, divider_y, board[2] - 22, divider_y), fill=stroke, width=1)
-    draw.text((board[0] + 22, divider_y + 16), "OFFICIAL PLAYS", font=_font(16, True), fill=muted)
+    draw.line((board[0] + 22, board_y + 78, board[2] - 22, board_y + 78), fill=soft_stroke, width=1)
+    draw.text((board[0] + 22, board_y + 94), "OFFICIAL PLAYS", font=_font(16, True), fill=muted)
 
-    # Play rows
+    # play rows
     row_x1 = board[0] + 22
     row_x2 = board[2] - 22
-    current_y = rows_y
+    current_y = rows_top
 
     for idx, play in enumerate(plays, start=1):
         row_box = (row_x1, current_y, row_x2, current_y + row_h)
         _rounded_rect(draw, row_box, 18, fill=row_fill, outline=stroke, width=1)
 
-        num_chip = (row_x1 + 16, current_y + 21, row_x1 + 58, current_y + 63)
+        num_chip = (row_x1 + 16, current_y + 20, row_x1 + 58, current_y + 62)
         _rounded_rect(draw, num_chip, 14, fill=(12, 21, 17), outline=(68, 112, 70), width=1)
         num_text = str(idx)
         num_w = _text_width(draw, num_text, _font(20, True))
-        draw.text((num_chip[0] + (42 - num_w) / 2, current_y + 26), num_text, font=_font(20, True), fill=green)
+        draw.text((num_chip[0] + (42 - num_w) / 2, current_y + 25), num_text, font=_font(20, True), fill=green)
 
-        _draw_check(draw, row_x1 + 74, current_y + 18)
+        _draw_check(draw, row_x1 + 74, current_y + 17)
 
         label = _play_label(play)
-        label_text, label_font = _fit_text(draw, label, row_x2 - (row_x1 + 136) - 68, 24, True, 15)
-        draw.text((row_x1 + 134, current_y + 17), label_text, font=label_font, fill=white)
+        label_text, label_font = _fit_text(draw, label, row_x2 - (row_x1 + 136) - 60, 23, True, 15)
+        draw.text((row_x1 + 134, current_y + 16), label_text, font=label_font, fill=white)
 
-        meta = []
+        meta_parts = []
         if play.get("unit"):
-            meta.append(_format_unit(play.get("unit", "")))
+            meta_parts.append(_format_unit(play.get("unit", "")))
         if play.get("history"):
-            meta.append(f"History {str(play.get('history')).strip()}")
-        if meta:
-            draw.text((row_x1 + 134, current_y + 49), "   •   ".join(meta), font=_font(15, False), fill=off_white)
+            meta_parts.append(f"History {str(play.get('history')).strip()}")
+        if meta_parts:
+            draw.text((row_x1 + 134, current_y + 47), "   •   ".join(meta_parts), font=_font(15, False), fill=off_white)
 
         draw.rounded_rectangle((row_x2 - 12, current_y + 14, row_x2 - 6, current_y + row_h - 14), radius=3, fill=green)
         current_y += row_h + row_gap
 
-    # Banner - no duplicate bottom unit chip
+    # banner
     banner_frame = (board[0] + 22, banner_y, board[2] - 22, banner_y + banner_h)
     _rounded_rect(draw, banner_frame, 22, fill=(11, 17, 20), outline=(55, 73, 80), width=1)
     _paste_cover(img, BANNER_PATH, (banner_frame[0] + 10, banner_frame[1] + 10, banner_frame[2] - 10, banner_frame[3] - 10), radius=18)
@@ -519,10 +517,10 @@ def _generate_pick_card(row: dict) -> Path:
     gd = ImageDraw.Draw(gloss)
     gd.polygon([
         (banner_frame[0] + 10, banner_frame[1] + 10),
-        (banner_frame[0] + 330, banner_frame[1] + 10),
-        (banner_frame[0] + 230, banner_frame[1] + 98),
-        (banner_frame[0] + 10, banner_frame[1] + 98),
-    ], fill=(255, 255, 255, 20))
+        (banner_frame[0] + 310, banner_frame[1] + 10),
+        (banner_frame[0] + 220, banner_frame[1] + 96),
+        (banner_frame[0] + 10, banner_frame[1] + 96),
+    ], fill=(255, 255, 255, 18))
     img.alpha_composite(gloss)
 
     img = img.convert("RGB")
