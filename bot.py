@@ -29,7 +29,7 @@ BRAND_NAME = "BALIHQBETS"
 DEFAULT_SHEET_ID = "YOUR_SHEET_ID_HERE"
 
 EST_TZ = ZoneInfo("America/New_York")
-POST_WINDOW_MINUTES = 5
+POST_WINDOW_MINUTES = 8
 
 
 def _normalize_header(header: str) -> str:
