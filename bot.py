@@ -19,11 +19,6 @@ BRAND_NAME = "BALIHQBETS"
 DEFAULT_SHEET_ID = "YOUR_SHEET_ID_HERE"
 
 
-def _clean(value, fallback="N/A"):
-    value = str(value or "").strip()
-    return value if value else fallback
-
-
 def _get_value(row: dict, *keys: str, fallback: str = "N/A") -> str:
     """Read a sheet value while tolerating small header-name differences."""
     normalized = {str(k).strip().lower(): v for k, v in row.items()}
@@ -37,61 +32,57 @@ def _get_value(row: dict, *keys: str, fallback: str = "N/A") -> str:
     return fallback
 
 
+def _format_unit(unit: str) -> str:
+    if unit == "N/A":
+        return "Unit: N/A"
+
+    clean_unit = unit.strip()
+    if clean_unit.lower().endswith("u"):
+        return clean_unit
+
+    return f"{clean_unit}u"
+
+
 def _build_embed_payload(row: dict, avatar_file_name: str | None = None, banner_file_name: str | None = None) -> dict:
-    league = _get_value(row, "LEAGUE", fallback="Bet")
-    est = _get_value(row, "EST")
-    mtn = _get_value(row, "MTN", "MST")
+    league = _get_value(row, "LEAGUE", fallback="TT Elite")
     pst = _get_value(row, "PST")
+    mtn = _get_value(row, "MTN", "MST")
+    est = _get_value(row, "EST")
     player_1 = _get_value(row, "Player 1", "Player1", fallback="TBD")
     player_2 = _get_value(row, "Player 2", "Player2", fallback="TBD")
     bet = _get_value(row, "BET", fallback="No Bet Found")
     unit = _get_value(row, "Unit", "Units")
     history = _get_value(row, "History", "Unit History")
 
-    time_parts = []
+    time_line_parts = []
     if est != "N/A":
-        time_parts.append(f"{est} EST")
+        time_line_parts.append(f"{est} EST")
     if mtn != "N/A":
-        time_parts.append(f"{mtn} MTN")
+        time_line_parts.append(f"{mtn} MTN")
     if pst != "N/A":
-        time_parts.append(f"{pst} PST")
+        time_line_parts.append(f"{pst} PST")
 
-    time_text = " | ".join(time_parts) if time_parts else "N/A"
+    time_line = " | ".join(time_line_parts) if time_line_parts else "N/A"
+    unit_text = _format_unit(unit)
 
-    bet_text = bet
-    if unit != "N/A":
-        bet_text = f"{bet}\nUnit: {unit}"
+    bet_line = f"✅ **{bet}**"
+    if history != "N/A":
+        bet_line += f" • {history} L20"
 
-    # Original embed style preserved. Only the data mapping is fixed.
     embed: dict = {
         "color": DISCORD_EMBED_COLOR,
         "author": {
             "name": f"🌴 {BRAND_NAME}",
         },
-        "title": f"🏆 NEW {league} ALERT 🏆",
-        "description": "━━━━━━━━━━━━━━━━━━━━",
-        "fields": [
-            {
-                "name": "⏰ Time",
-                "value": time_text,
-                "inline": False,
-            },
-            {
-                "name": "👥 Matchup",
-                "value": f"{player_1} vs {player_2}",
-                "inline": False,
-            },
-            {
-                "name": "🔥 BET",
-                "value": bet_text,
-                "inline": False,
-            },
-            {
-                "name": "📈 History",
-                "value": history,
-                "inline": False,
-            },
-        ],
+        "description": (
+            f"## 🕒 {time_line}\n"
+            f"### {player_1} `vs` {player_2}\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"### {league}\n"
+            f"*1 play*\n\n"
+            f"{bet_line}\n"
+            f"`{unit_text}`"
+        ),
         "footer": {
             "text": f"🌴 {BRAND_NAME}",
         },
