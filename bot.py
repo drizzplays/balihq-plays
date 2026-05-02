@@ -20,7 +20,7 @@ def run_automation():
     try:
         # 1. Open the Sheet
         # Replace the ID below with your actual Google Sheet ID
-        sheet_id = "YOUR_SHEET_ID_HERE" 
+        sheet_id = "12jKPYa58oYAOyfj8FP5v6VrMZe4gVybR7zSq1T4bkBE" 
         sheet = client.open_by_key(sheet_id).sheet1
         
         # 2. Get the latest row
