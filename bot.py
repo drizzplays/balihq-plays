@@ -338,7 +338,8 @@ def _format_unit(unit: str) -> str:
     unit = str(unit or "").strip()
     if not unit:
         return ""
-    return unit if unit.lower().endswith("u") else f"{unit}u"
+    unit = unit.upper() if unit.lower().endswith("u") else f"{unit}U"
+    return unit
 
 
 def _generate_pick_card(row: dict) -> Path:
@@ -376,12 +377,12 @@ def _generate_pick_card(row: dict) -> Path:
     board_y = matchup_y + matchup_h + 24
 
     chip_h = 42
-    rows_top = board_y + 104
+    rows_top = board_y + 126
     row_h = 82
     row_gap = 14
     rows_h = play_count * row_h + max(0, play_count - 1) * row_gap
     banner_y = rows_top + rows_h + 26
-    banner_h = 212
+    banner_h = 356
     board_bottom = banner_y + banner_h + 24
     total_h = board_bottom + 42
 
@@ -417,7 +418,7 @@ def _generate_pick_card(row: dict) -> Path:
 
     logo_badge = (right - 170, header_y + 10, right - 18, header_y + 82)
     # cleaner top accent line: keep it away from the avatar/text on the left and logo badge on the right
-    accent_y1 = header[1] + 18
+    accent_y1 = header[1] + 8
     accent_y2 = accent_y1 + 4
     accent_x1 = header[0] + 62
     accent_x2 = logo_badge[0] - 18
@@ -430,12 +431,13 @@ def _generate_pick_card(row: dict) -> Path:
     _draw_soft_glow(img, matchup_box, radius=24, color=(124, 255, 0, 58), border=4)
     _rounded_rect(draw, matchup_box, 24, fill=(8, 14, 16), outline=green, width=2)
 
-    time_chip = (matchup_box[0] + 18, matchup_y + 14, matchup_box[0] + 168, matchup_y + 80)
+    time_chip = (matchup_box[0] + 18, matchup_y + 14, matchup_box[0] + 206, matchup_y + 80)
     _rounded_rect(draw, time_chip, 18, fill=(13, 23, 18), outline=(72, 118, 74), width=1)
     _draw_clock(draw, time_chip[0] + 14, time_chip[1] + 10)
-    time_text, time_font = _fit_text(draw, est, 86, 25, True, 16)
-    draw.text((time_chip[0] + 56, time_chip[1] + 7), time_text, font=time_font, fill=white)
-    draw.text((time_chip[0] + 56, time_chip[1] + 34), "EST", font=_font(16, True), fill=green)
+    time_text, time_font = _fit_text(draw, est, 112, 22, True, 16)
+    time_text_x = time_chip[0] + 72
+    draw.text((time_text_x, time_chip[1] + 9), time_text, font=time_font, fill=white)
+    draw.text((time_text_x, time_chip[1] + 37), "EST", font=_font(15, True), fill=green)
 
     divider_x = time_chip[2] + 28
     draw.line((divider_x, matchup_y + 18, divider_x, matchup_y + matchup_h - 18), fill=(56, 74, 81), width=2)
