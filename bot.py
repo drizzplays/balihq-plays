@@ -16,7 +16,7 @@ BRAND_NAME = "BALIHQBETS"
 
 
 # Replace this with your real Google Sheet ID or set GOOGLE_SHEET_ID in GitHub Secrets.
-DEFAULT_SHEET_ID = "YOUR_SHEET_ID_HERE"
+DEFAULT_SHEET_ID = "12jKPYa58oYAOyfj8FP5v6VrMZe4gVybR7zSq1T4bkBE"
 
 
 def _clean(value, fallback="N/A"):
