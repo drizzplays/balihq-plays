@@ -1,51 +1,57 @@
-import discord
-from discord.ext import commands
 import os
+import gspread
+from google.oauth2.service_account import Credentials
+import requests
+import json
 
-# 1. Setup Intents (Required for modern Discord bots)
-intents = discord.Intents.default()
-intents.message_content = True  # Allows bot to read commands
+def run_automation():
+    # 1. Load Google Credentials from Environment Variable
+    # This keeps your JSON key secure in your CI/CD secrets
+    creds_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if not creds_json:
+        print("Error: GOOGLE_SERVICE_ACCOUNT_JSON not found.")
+        return
 
-# 2. Define the Bot instance
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-# 3. Profile Update Command
-@bot.command()
-async def update_profile(ctx):
-    """Updates the bot's avatar and banner from the /images folder"""
-    avatar_path = "images/avatar.png"
-    banner_path = "images/banner.png"
+    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    creds_data = json.loads(creds_json)
+    creds = Credentials.from_service_account_info(creds_data, scopes=scopes)
+    client = gspread.authorize(creds)
 
     try:
-        # Update Avatar
-        if os.path.exists(avatar_path):
-            with open(avatar_path, "rb") as f:
-                await bot.user.edit(avatar=f.read())
-            await ctx.send("✅ Avatar updated successfully.")
-        else:
-            await ctx.send("❌ Avatar file not found in /images.")
-
-        # Update Banner (Note: Requires specific bot permissions/tier)
-        if os.path.exists(banner_path):
-            with open(banner_path, "rb") as f:
-                await bot.user.edit(banner=f.read())
-            await ctx.send("✅ Banner updated successfully.")
+        # 2. Open the Sheet (Use your Sheet ID from the URL)
+        sheet_id = "YOUR_SHEET_ID_HERE" 
+        sheet = client.open_by_key(sheet_id).sheet1 # Opens the first tab
         
-    except discord.HTTPException as e:
-        await ctx.send(f"⚠️ Discord API error: {e}")
+        # 3. Get Data (Example: Get the last row of data)
+        records = sheet.get_all_records()
+        if not records:
+            print("Sheet is empty.")
+            return
+            
+        latest_play = records[-1] # Grabs the last row
+        
+        # 4. Format the Message
+        # Customize these keys to match your Sheet headers (e.g., 'Player', 'Prop')
+        message = (
+            f"🚀 **New Sheet Update** 🚀\n"
+            f"**Event:** {latest_play.get('Event', 'N/A')}\n"
+            f"**Play:** {latest_play.get('Play', 'N/A')}\n"
+            f"**Odds:** {latest_play.get('Odds', 'N/A')}"
+        )
+
+        # 5. Send to Discord Webhook
+        webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
+        payload = {"content": message}
+        
+        response = requests.post(webhook_url, json=payload)
+        
+        if response.status_code == 204:
+            print("Successfully posted to Discord via Webhook.")
+        else:
+            print(f"Failed to post. Status: {response.status_code}")
+
     except Exception as e:
-        await ctx.send(f"⚠️ General error: {e}")
-
-@bot.event
-async def on_ready():
-    print(f'Logged in as {bot.user.name} (ID: {bot.user.id})')
-    print('------')
-
-# 4. Run the Bot using Environment Variables (Best practice for CI/CD)
-token = os.getenv('BOT_TOKEN')
+        print(f"An error occurred: {e}")
 
 if __name__ == "__main__":
-    if token:
-        bot.run(token)
-    else:
-        print("CRITICAL ERROR: 'BOT_TOKEN' environment variable not found.")
+    run_automation()
