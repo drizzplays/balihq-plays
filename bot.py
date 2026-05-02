@@ -377,12 +377,12 @@ def _generate_pick_card(row: dict) -> Path:
     board_y = matchup_y + matchup_h + 24
 
     chip_h = 42
-    rows_top = board_y + 126
-    row_h = 82
+    rows_top = board_y + 142
+    row_h = 86
     row_gap = 14
     rows_h = play_count * row_h + max(0, play_count - 1) * row_gap
-    banner_y = rows_top + rows_h + 26
-    banner_h = 356
+    banner_y = rows_top + rows_h + 28
+    banner_h = 330
     board_bottom = banner_y + banner_h + 24
     total_h = board_bottom + 42
 
@@ -431,13 +431,14 @@ def _generate_pick_card(row: dict) -> Path:
     _draw_soft_glow(img, matchup_box, radius=24, color=(124, 255, 0, 58), border=4)
     _rounded_rect(draw, matchup_box, 24, fill=(8, 14, 16), outline=green, width=2)
 
-    time_chip = (matchup_box[0] + 18, matchup_y + 14, matchup_box[0] + 206, matchup_y + 80)
+    time_chip = (matchup_box[0] + 18, matchup_y + 14, matchup_box[0] + 226, matchup_y + 80)
     _rounded_rect(draw, time_chip, 18, fill=(13, 23, 18), outline=(72, 118, 74), width=1)
     _draw_clock(draw, time_chip[0] + 14, time_chip[1] + 10)
-    time_text, time_font = _fit_text(draw, est, 112, 22, True, 16)
-    time_text_x = time_chip[0] + 72
-    draw.text((time_text_x, time_chip[1] + 9), time_text, font=time_font, fill=white)
-    draw.text((time_text_x, time_chip[1] + 37), "EST", font=_font(15, True), fill=green)
+    clean_est = str(est).upper().replace("EST", "").replace("EDT", "").strip() or est
+    time_text, time_font = _fit_text(draw, clean_est, 130, 23, True, 16)
+    time_text_x = time_chip[0] + 76
+    draw.text((time_text_x, time_chip[1] + 7), time_text, font=time_font, fill=white)
+    draw.text((time_text_x + 2, time_chip[1] + 38), "EST", font=_font(14, True), fill=green)
 
     divider_x = time_chip[2] + 28
     draw.line((divider_x, matchup_y + 18, divider_x, matchup_y + matchup_h - 18), fill=(56, 74, 81), width=2)
@@ -476,12 +477,12 @@ def _generate_pick_card(row: dict) -> Path:
     if primary_unit:
         unit_chip = (board[2] - 156, chip_y, board[2] - 22, chip_y + chip_h)
         _rounded_rect(draw, unit_chip, 16, fill=(13, 24, 17), outline=(74, 121, 78), width=1)
-        unit_label = f"UNIT {primary_unit}"
+        unit_label = f"STAKE {primary_unit}"
         unit_w = _text_width(draw, unit_label, _font(18, True))
         draw.text((unit_chip[0] + ((unit_chip[2] - unit_chip[0]) - unit_w) / 2, chip_y + 10), unit_label, font=_font(18, True), fill=green)
 
     draw.line((board[0] + 22, board_y + 78, board[2] - 22, board_y + 78), fill=soft_stroke, width=1)
-    draw.text((board[0] + 22, board_y + 94), "OFFICIAL PLAYS", font=_font(16, True), fill=muted)
+    draw.text((board[0] + 22, board_y + 98), "OFFICIAL PLAYS", font=_font(16, True), fill=muted)
 
     # play rows
     row_x1 = board[0] + 22
@@ -500,19 +501,35 @@ def _generate_pick_card(row: dict) -> Path:
 
         _draw_check(draw, row_x1 + 74, current_y + 17)
 
-        label = _play_label(play)
-        label_text, label_font = _fit_text(draw, label, row_x2 - (row_x1 + 136) - 60, 23, True, 15)
-        draw.text((row_x1 + 134, current_y + 16), label_text, font=label_font, fill=white)
+        bet_text = str(play.get("bet", "") or "No Bet Found").strip()
+        history_text = str(play.get("history", "") or "").strip()
+        main_x = row_x1 + 134
+        max_main_w = row_x2 - main_x - 70
+
+        if history_text:
+            record_label = f"{history_text} L20"
+            record_font = _font(22, True)
+            bullet_font = _font(22, True)
+            record_w = _text_width(draw, record_label, record_font)
+            bullet_w = _text_width(draw, "  •  ", bullet_font)
+            bet_fit, bet_font = _fit_text(draw, bet_text, max_main_w - record_w - bullet_w, 23, True, 15)
+            draw.text((main_x, current_y + 16), bet_fit, font=bet_font, fill=white)
+            bet_w = _text_width(draw, bet_fit, bet_font)
+            draw.text((main_x + bet_w, current_y + 16), "  •  ", font=bullet_font, fill=off_white)
+            draw.text((main_x + bet_w + bullet_w, current_y + 16), record_label, font=record_font, fill=white)
+        else:
+            bet_fit, bet_font = _fit_text(draw, bet_text, max_main_w, 23, True, 15)
+            draw.text((main_x, current_y + 16), bet_fit, font=bet_font, fill=white)
 
         meta_parts = []
         if play.get("unit"):
             meta_parts.append(_format_unit(play.get("unit", "")))
-        if play.get("history"):
-            meta_parts.append(f"History {str(play.get('history')).strip()}")
+        if history_text:
+            meta_parts.append(f"History {history_text}")
         if meta_parts:
-            draw.text((row_x1 + 134, current_y + 47), "   •   ".join(meta_parts), font=_font(15, False), fill=off_white)
+            draw.text((main_x, current_y + 50), "   •   ".join(meta_parts), font=_font(15, False), fill=off_white)
 
-        draw.rounded_rectangle((row_x2 - 12, current_y + 14, row_x2 - 6, current_y + row_h - 14), radius=3, fill=green)
+        draw.rounded_rectangle((row_x2 - 12, current_y + 16, row_x2 - 7, current_y + row_h - 16), radius=3, fill=(110, 240, 0))
         current_y += row_h + row_gap
 
     # banner
