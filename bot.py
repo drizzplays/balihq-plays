@@ -1,211 +1,225 @@
-import os
-from pathlib import Path
 import json
+import os
+from datetime import datetime, timezone
+from collections import defaultdict
 
 import gspread
-from google.oauth2.service_account import Credentials
 import requests
+from google.oauth2.service_account import Credentials
 
 
-DISCORD_EMBED_COLOR = 0x7CFF00
-BASE_DIR = Path(__file__).resolve().parent
-IMAGES_DIR = BASE_DIR / "images"
-AVATAR_PATH = IMAGES_DIR / "avatar.png"
-BANNER_PATH = IMAGES_DIR / "banner.png"
-BRAND_NAME = "BALIHQBETS"
+# Required GitHub secrets:
+# - GOOGLE_SERVICE_ACCOUNT_JSON
+# - DISCORD_WEBHOOK_URL
+# - GOOGLE_SHEET_ID
+#
+# Optional GitHub secrets / env vars:
+# - SHEET_NAME                 Defaults to first sheet tab
+# - DISCORD_USERNAME           Defaults to BaliHQ Plays
+# - DISCORD_AVATAR_URL         Optional webhook avatar URL
+# - DISCORD_EMBED_COLOR        Decimal or hex, ex: 3447003 or 0x3498db
+# - COUNTRY_FLAG               Defaults to 🇵🇱
+
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+]
+
+POSTED_HEADER = "Posted"
+MAX_FIELDS_PER_EMBED = 25
 
 
-# Replace this with your real Google Sheet ID or set GOOGLE_SHEET_ID in GitHub Secrets.
-DEFAULT_SHEET_ID = "12jKPYa58oYAOyfj8FP5v6VrMZe4gVybR7zSq1T4bkBE"
+def require_env(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise ValueError(f"Missing required environment variable: {name}")
+    return value
 
 
-def _clean(value, fallback="N/A"):
-    value = str(value or "").strip()
-    return value if value else fallback
+def clean(value) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
 
 
-def _normalize_row(row: dict) -> dict:
-    """Normalize header keys so minor sheet-header differences do not break the bot."""
-    normalized = {}
-    for key, value in (row or {}).items():
-        normalized[str(key).strip().lower()] = value
-    return normalized
-
-
-def _pick(row: dict, *keys, fallback="N/A"):
+def first_value(row: dict, *keys: str, default: str = "") -> str:
+    """Return the first non-empty value from a row, accepting multiple possible headers."""
+    lower_map = {str(k).strip().lower(): v for k, v in row.items()}
     for key in keys:
-        if key in row:
-            value = str(row.get(key) or "").strip()
-            if value:
-                return value
-    return fallback
+        value = lower_map.get(key.lower())
+        if clean(value):
+            return clean(value)
+    return default
 
 
-def _build_embed_payload(row: dict, avatar_file_name: str | None = None, banner_file_name: str | None = None) -> dict:
-    normalized = _normalize_row(row)
+def parse_color(value: str | None) -> int:
+    if not value:
+        return 0x2F80ED
+    value = value.strip()
+    if value.lower().startswith("0x"):
+        return int(value, 16)
+    if value.startswith("#"):
+        return int(value[1:], 16)
+    return int(value)
 
-    league = _pick(normalized, "league", fallback="Bet Alert")
-    pst = _pick(normalized, "pst")
-    mtn = _pick(normalized, "mtn", "mst")
-    est = _pick(normalized, "est")
-    player_1 = _pick(normalized, "player 1", "player1", fallback="TBD")
-    player_2 = _pick(normalized, "player 2", "player2", fallback="TBD")
-    bet = _pick(normalized, "bet", fallback="No Bet Found")
-    unit = _pick(normalized, "unit", "units")
-    history = _pick(normalized, "history", "unit history")
 
-    # Cleaner layout: less clutter, actual sheet columns displayed, and no fake N/A when valid headers exist.
-    embed: dict = {
-        "color": DISCORD_EMBED_COLOR,
-        "author": {
-            "name": BRAND_NAME,
-        },
-        "title": "🏆 NEW BET ALERT 🏆",
-        "description": f"**League:** {league}",
-        "fields": [
-            {
-                "name": "⏰ PST",
-                "value": pst,
-                "inline": True,
-            },
-            {
-                "name": "⛰️ MTN",
-                "value": mtn,
-                "inline": True,
-            },
-            {
-                "name": "🕒 EST",
-                "value": est,
-                "inline": True,
-            },
-            {
-                "name": "🎯 Matchup",
-                "value": f"{player_1} vs {player_2}",
-                "inline": False,
-            },
-            {
-                "name": "🔥 Bet",
-                "value": bet,
-                "inline": True,
-            },
-            {
-                "name": "💰 Unit",
-                "value": unit,
-                "inline": True,
-            },
-            {
-                "name": "📈 History",
-                "value": history,
-                "inline": False,
-            },
-        ],
-        "footer": {
-            "text": BRAND_NAME,
-        },
+def get_sheet():
+    creds_json = require_env("GOOGLE_SERVICE_ACCOUNT_JSON")
+    sheet_id = require_env("GOOGLE_SHEET_ID")
+    sheet_name = os.getenv("SHEET_NAME")
+
+    creds_data = json.loads(creds_json)
+    creds = Credentials.from_service_account_info(creds_data, scopes=SCOPES)
+    client = gspread.authorize(creds)
+    spreadsheet = client.open_by_key(sheet_id)
+
+    if sheet_name:
+        return spreadsheet.worksheet(sheet_name)
+    return spreadsheet.sheet1
+
+
+def ensure_posted_column(sheet) -> int:
+    headers = sheet.row_values(1)
+    normalized = [h.strip().lower() for h in headers]
+
+    if POSTED_HEADER.lower() in normalized:
+        return normalized.index(POSTED_HEADER.lower()) + 1
+
+    next_col = len(headers) + 1
+    sheet.update_cell(1, next_col, POSTED_HEADER)
+    return next_col
+
+
+def latest_unposted_groups(sheet):
+    posted_col = ensure_posted_column(sheet)
+    records = sheet.get_all_records()
+
+    unposted = []
+    for idx, row in enumerate(records, start=2):
+        posted_value = first_value(row, POSTED_HEADER)
+        bet = first_value(row, "BET", "Play", "Pick", "Prop")
+        if not posted_value and bet:
+            unposted.append({"sheet_row": idx, **row})
+
+    groups = defaultdict(list)
+    for row in unposted:
+        key = (
+            first_value(row, "EST", "Time EST", "Start EST", default="TBD"),
+            first_value(row, "PST", "Time PST", "Start PST", default=""),
+            first_value(row, "Player 1", "Player1", "P1", default="TBD"),
+            first_value(row, "Player 2", "Player2", "P2", default="TBD"),
+            first_value(row, "LEAGUE", "League", "Competition", default="Bet"),
+        )
+        groups[key].append(row)
+
+    return groups, posted_col
+
+
+def format_play(row: dict) -> tuple[str, str]:
+    player = first_value(row, "Player", "Selection", "Target", "Name")
+    bet = first_value(row, "BET", "Play", "Pick", "Prop", default="No Bet Found")
+    history = first_value(row, "Unit History", "History", "Record", "Trend", "Line", "Streak")
+    odds = first_value(row, "Odds", "Price")
+    confidence = first_value(row, "Confidence", "%", "Percent", "Hit Rate")
+
+    # If the sheet does not have a separate Player/Selection column, keep BET as the main line.
+    name = player if player else bet
+
+    details = []
+    if player:
+        details.append(bet)
+    if history:
+        details.append(history)
+    if odds:
+        details.append(f"Odds: {odds}")
+    if confidence:
+        details.append(f"Confidence: {confidence}")
+
+    value = "\n".join(details) if details else "—"
+    return name[:256], value[:1024]
+
+
+def build_embed(event_key: tuple, rows: list[dict]) -> dict:
+    est, pst, player_1, player_2, league = event_key
+    flag = os.getenv("COUNTRY_FLAG", "🇵🇱")
+
+    time_line = f"{est} EST" if est != "TBD" else "TBD"
+    if pst:
+        time_line += f" | {pst} PST"
+
+    embed = {
+        "title": f"{time_line} | {player_1} vs {player_2}",
+        "description": f"{flag} *{league}*\n**{len(rows)} play{'s' if len(rows) != 1 else ''}**",
+        "color": parse_color(os.getenv("DISCORD_EMBED_COLOR")),
+        "fields": [],
+        "footer": {"text": "BaliHQ Plays"},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
-    if avatar_file_name:
-        avatar_url = f"attachment://{avatar_file_name}"
-        embed["author"]["icon_url"] = avatar_url
-        embed["thumbnail"] = {"url": avatar_url}
-        embed["footer"]["icon_url"] = avatar_url
+    for row in rows[:MAX_FIELDS_PER_EMBED]:
+        name, value = format_play(row)
+        embed["fields"].append({
+            "name": f"🔥 {name}",
+            "value": value,
+            "inline": False,
+        })
 
-    if banner_file_name:
-        embed["image"] = {"url": f"attachment://{banner_file_name}"}
+    if len(rows) > MAX_FIELDS_PER_EMBED:
+        embed["fields"].append({
+            "name": "More plays",
+            "value": f"{len(rows) - MAX_FIELDS_PER_EMBED} additional plays were not shown because Discord embeds max out at 25 fields.",
+            "inline": False,
+        })
 
-    return {
-        "content": "",
+    return embed
+
+
+def post_to_discord(embed: dict):
+    webhook_url = require_env("DISCORD_WEBHOOK_URL")
+
+    payload = {
+        "username": os.getenv("DISCORD_USERNAME", "BaliHQ Plays"),
         "embeds": [embed],
     }
 
+    avatar_url = os.getenv("DISCORD_AVATAR_URL")
+    if avatar_url:
+        payload["avatar_url"] = avatar_url
 
-def _post_embed_to_discord(webhook_url: str, payload: dict) -> requests.Response:
-    files = []
-    open_files = []
+    response = requests.post(webhook_url, json=payload, timeout=20)
 
-    try:
-        if AVATAR_PATH.exists():
-            avatar_file = AVATAR_PATH.open("rb")
-            open_files.append(avatar_file)
-            files.append(("files[0]", (AVATAR_PATH.name, avatar_file, "image/png")))
-
-        if BANNER_PATH.exists():
-            banner_file = BANNER_PATH.open("rb")
-            open_files.append(banner_file)
-            files.append(("files[1]", (BANNER_PATH.name, banner_file, "image/png")))
-
-        if files:
-            return requests.post(
-                webhook_url,
-                data={"payload_json": json.dumps(payload)},
-                files=files,
-                timeout=30,
-            )
-
-        return requests.post(webhook_url, json=payload, timeout=30)
-
-    finally:
-        for file_obj in open_files:
-            file_obj.close()
+    if response.status_code not in (200, 204):
+        raise RuntimeError(f"Discord post failed: {response.status_code} - {response.text}")
 
 
-def _get_latest_row(sheet) -> dict | None:
-    """Return the latest row with at least one non-empty value."""
-    records = sheet.get_all_records()
-    if not records:
-        return None
+def mark_rows_posted(sheet, posted_col: int, rows: list[dict]):
+    posted_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    updates = []
 
-    for row in reversed(records):
-        if any(str(v or "").strip() for v in row.values()):
-            return row
-    return None
+    for row in rows:
+        updates.append({
+            "range": gspread.utils.rowcol_to_a1(row["sheet_row"], posted_col),
+            "values": [[posted_at]],
+        })
+
+    if updates:
+        sheet.batch_update(updates)
 
 
 def run_automation():
-    creds_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-    webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
-    sheet_id = os.getenv("GOOGLE_SHEET_ID", DEFAULT_SHEET_ID)
+    sheet = get_sheet()
+    groups, posted_col = latest_unposted_groups(sheet)
 
-    if not creds_json or not webhook_url:
-        print("❌ Error: Missing Environment Variables")
+    if not groups:
+        print("✅ No new unposted plays found.")
         return
 
-    if not sheet_id or sheet_id == "YOUR_SHEET_ID_HERE":
-        print("❌ Error: Missing Google Sheet ID. Set GOOGLE_SHEET_ID in GitHub Secrets or edit DEFAULT_SHEET_ID.")
-        return
-
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
-    ]
-
-    creds_data = json.loads(creds_json)
-    creds = Credentials.from_service_account_info(creds_data, scopes=scopes)
-    client = gspread.authorize(creds)
-
-    try:
-        sheet = client.open_by_key(sheet_id).sheet1
-        row = _get_latest_row(sheet)
-
-        if not row:
-            print("⚠️ Sheet is empty.")
-            return
-
-        print(f"✅ Found data for: {row.get('Player 1')} vs {row.get('Player 2')}")
-
-        avatar_file_name = AVATAR_PATH.name if AVATAR_PATH.exists() else None
-        banner_file_name = BANNER_PATH.name if BANNER_PATH.exists() else None
-        payload = _build_embed_payload(row, avatar_file_name, banner_file_name)
-
-        response = _post_embed_to_discord(webhook_url, payload)
-
-        if response.status_code in (200, 204):
-            print("🚀 Success! Play posted to Discord as an embed.")
-        else:
-            print(f"❌ Failed. Status: {response.status_code}, Response: {response.text}")
-
-    except Exception as e:
-        print(f"❌ Python Error: {e}")
+    for event_key, rows in groups.items():
+        embed = build_embed(event_key, rows)
+        print(f"🚀 Posting {len(rows)} play(s): {embed['title']}")
+        post_to_discord(embed)
+        mark_rows_posted(sheet, posted_col, rows)
+        print("✅ Posted and marked rows as posted.")
 
 
 if __name__ == "__main__":
