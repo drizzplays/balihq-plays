@@ -31,8 +31,8 @@ DEFAULT_SHEET_ID = "YOUR_SHEET_ID_HERE"
 
 EST_TZ = ZoneInfo("America/New_York")
 
-# Bot posts during this window:
-# game time - 5 minutes through game time.
+# GitHub Actions checks every 5 minutes and can run late.
+# 8 minutes gives the bot enough room to catch the play before it starts.
 POST_WINDOW_MINUTES = 8
 
 
@@ -144,7 +144,6 @@ def _parse_est_datetime(row: dict) -> datetime | None:
         except ValueError:
             continue
 
-    # Try again without spaces.
     compact_time = cleaned_time.replace(" ", "")
 
     compact_formats = [
