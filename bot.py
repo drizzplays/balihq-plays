@@ -1,6 +1,9 @@
 import os
 from pathlib import Path
 import json
+import time
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -19,10 +22,60 @@ BASE_DIR = Path(__file__).resolve().parent
 IMAGES_DIR = BASE_DIR / "images"
 AVATAR_PATH = IMAGES_DIR / "avatar.png"
 BANNER_PATH = IMAGES_DIR / "banner.png"
-GENERATED_CARD_PATH = BASE_DIR / "generated_bali_pick.png"
+GENERATED_CARD_PATH = BASE_DIR / f"generated_bali_pick_{int(time.time())}.png"
 
 BRAND_NAME = "BALIHQBETS"
 DEFAULT_SHEET_ID = "YOUR_SHEET_ID_HERE"
+
+EST_TZ = ZoneInfo("America/New_York")
+POST_WINDOW_MINUTES = 5
+
+
+def _normalize_header(header: str) -> str:
+    return str(header or "").strip()
+
+
+def _rows_from_sheet(sheet):
+    values = sheet.get_all_values()
+    if len(values) < 2:
+        return [], [], {}
+
+    raw_headers = [_normalize_header(h) for h in values[0]]
+    seen = {}
+    headers = []
+
+    # Handles duplicate headers like BET / Unit / History by renaming the second set:
+    # BET -> BET, second BET -> BET 2
+    for header in raw_headers:
+        if not header:
+            headers.append("")
+            continue
+
+        key = header.lower()
+        seen[key] = seen.get(key, 0) + 1
+
+        if seen[key] == 1:
+            headers.append(header)
+        else:
+            headers.append(f"{header} {seen[key]}")
+
+    rows = []
+    row_numbers = []
+
+    for index, row_values in enumerate(values[1:], start=2):
+        if not any(str(v or "").strip() for v in row_values):
+            continue
+
+        row = {}
+        for i, header in enumerate(headers):
+            if not header:
+                continue
+            row[header] = row_values[i] if i < len(row_values) else ""
+
+        rows.append(row)
+        row_numbers.append(index)
+
+    return rows, row_numbers, {h.lower(): i + 1 for i, h in enumerate(headers) if h}
 
 
 def _normalize_row(row: dict) -> dict:
@@ -31,24 +84,70 @@ def _normalize_row(row: dict) -> dict:
 
 def _get_value(row: dict, *keys: str, fallback: str = "N/A") -> str:
     normalized = _normalize_row(row)
+
     for key in keys:
         value = normalized.get(key.strip().lower())
         value = str(value or "").strip()
+
         if value:
             return value
+
     return fallback
 
 
-def _font(size: int, bold: bool = False):
-    paths = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
-        if bold else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+def _parse_est_datetime(row: dict) -> datetime | None:
+    est_text = _get_value(row, "EST", fallback="").strip()
+
+    if not est_text:
+        return None
+
+    today = datetime.now(EST_TZ).date()
+
+    formats = [
+        "%I:%M %p",
+        "%I:%M%p",
+        "%H:%M",
     ]
-    for path in paths:
+
+    for fmt in formats:
+        try:
+            parsed_time = datetime.strptime(est_text.upper().replace(" ", ""), fmt.replace(" ", "")).time()
+            return datetime.combine(today, parsed_time, tzinfo=EST_TZ)
+        except ValueError:
+            continue
+
+    return None
+
+
+def _is_post_time(row: dict) -> tuple[bool, str]:
+    play_time = _parse_est_datetime(row)
+
+    if not play_time:
+        return False, "Missing or invalid EST time"
+
+    now = datetime.now(EST_TZ)
+    start = play_time - timedelta(minutes=POST_WINDOW_MINUTES)
+
+    if start <= now <= play_time:
+        return True, f"Inside post window: {start.strftime('%I:%M %p')} - {play_time.strftime('%I:%M %p')} EST"
+
+    return False, f"Not time yet. Now: {now.strftime('%I:%M %p')} EST | Post at: {start.strftime('%I:%M %p')} EST"
+
+
+def _font(size: int, bold: bool = False):
+    font_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        if bold
+        else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
+        if bold
+        else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+    ]
+
+    for path in font_paths:
         if Path(path).exists():
             return ImageFont.truetype(path, size)
+
     return ImageFont.load_default()
 
 
@@ -57,14 +156,7 @@ def _text_width(draw: ImageDraw.ImageDraw, text: str, font) -> int:
     return box[2] - box[0]
 
 
-def _fit_text(
-    draw: ImageDraw.ImageDraw,
-    text: str,
-    max_width: int,
-    size: int,
-    bold: bool = True,
-    min_size: int = 16,
-):
+def _fit_text(draw: ImageDraw.ImageDraw, text: str, max_width: int, size: int, bold: bool = True, min_size: int = 16):
     text = str(text)
 
     for font_size in range(size, min_size - 1, -2):
@@ -74,8 +166,10 @@ def _fit_text(
 
     font = _font(min_size, bold)
     ellipsis = "..."
+
     while len(text) > 3 and _text_width(draw, text + ellipsis, font) > max_width:
         text = text[:-1]
+
     return text + ellipsis, font
 
 
@@ -99,6 +193,7 @@ def _paste_contain(canvas: Image.Image, image_path: Path, box: tuple[int, int, i
 
 def _draw_check(draw: ImageDraw.ImageDraw, x: int, y: int):
     green = (124, 255, 0)
+
     _rounded_rect(
         draw,
         (x, y, x + 56, y + 56),
@@ -113,6 +208,7 @@ def _draw_check(draw: ImageDraw.ImageDraw, x: int, y: int):
 
 def _draw_clock(draw: ImageDraw.ImageDraw, x: int, y: int):
     green = (124, 255, 0)
+
     draw.ellipse((x, y, x + 52, y + 52), outline=green, width=4)
     draw.line((x + 26, y + 10, x + 26, y + 28), fill=green, width=4)
     draw.line((x + 26, y + 28, x + 40, y + 38), fill=green, width=4)
@@ -128,7 +224,7 @@ def _draw_soft_glow(base: Image.Image, box, radius: int, color=(124, 255, 0, 110
 
 def _collect_plays(row: dict) -> list[dict]:
     normalized = _normalize_row(row)
-    plays: list[dict] = []
+    plays = []
 
     def get_any(*names: str) -> str:
         for name in names:
@@ -138,6 +234,7 @@ def _collect_plays(row: dict) -> list[dict]:
         return ""
 
     first_bet = get_any("bet")
+
     if first_bet:
         plays.append(
             {
@@ -156,6 +253,7 @@ def _collect_plays(row: dict) -> list[dict]:
             f"play{i}",
             f"play_{i}",
         )
+
         if not bet:
             continue
 
@@ -196,15 +294,19 @@ def _collect_plays(row: dict) -> list[dict]:
 def _play_label(play: dict) -> str:
     label = str(play.get("bet", "") or "No Bet Found").strip()
     history = str(play.get("history", "") or "").strip()
+
     if history:
         label += f"  •  {history} L20"
+
     return label
 
 
 def _format_unit(unit: str) -> str:
     unit = str(unit or "").strip()
+
     if not unit:
         return ""
+
     return unit if unit.lower().endswith("u") else f"{unit}u"
 
 
@@ -216,6 +318,7 @@ def _generate_pick_card(row: dict) -> Path:
 
     plays = _collect_plays(row)
     play_count = len(plays)
+
     primary_unit = _format_unit(
         plays[0].get("unit", "") or _get_value(row, "Unit", "Units", fallback="")
     )
@@ -266,12 +369,10 @@ def _generate_pick_card(row: dict) -> Path:
     img = Image.new("RGBA", (width, height), (*dark_bg, 255))
     draw = ImageDraw.Draw(img)
 
-    # Subtle dotted background
     for x in range(0, width, 26):
         for y in range(0, height, 26):
             draw.ellipse((x, y, x + 2, y + 2), fill=(18, 30, 31, 95))
 
-    # Outer card
     _rounded_rect(
         draw,
         (card_x1, 16, card_x2, height - 16),
@@ -281,13 +382,12 @@ def _generate_pick_card(row: dict) -> Path:
         width=2,
     )
 
-    # Brand row
     _paste_contain(img, AVATAR_PATH, (44, brand_top, 92, brand_top + 48))
     draw.text((106, brand_top - 1), BRAND_NAME, font=_font(30, True), fill=white)
     _paste_contain(img, AVATAR_PATH, (972, 26, 1088, 126))
 
-    # Time / matchup bar
     top_bar = (top_bar_x1, top_bar_top, top_bar_x2, top_bar_top + top_bar_h)
+
     _draw_soft_glow(img, top_bar, radius=18)
     _rounded_rect(draw, top_bar, 18, fill=top_fill, outline=green, width=2)
 
@@ -317,14 +417,14 @@ def _generate_pick_card(row: dict) -> Path:
     else:
         draw.text((274, top_bar_top + 34), matchup_text, font=matchup_font, fill=white)
 
-    # Main panel
     panel_box = (panel_x1, panel_top, panel_x2, panel_bottom)
+
     _draw_soft_glow(img, panel_box, radius=24)
     _rounded_rect(draw, panel_box, 24, fill=panel_fill, outline=green, width=2)
 
-    # League header
     flag_x = 86
     flag_y = league_top + 8
+
     draw.rectangle((flag_x, flag_y, flag_x + 76, flag_y + 56), fill=(235, 235, 235))
     draw.rectangle((flag_x, flag_y + 28, flag_x + 76, flag_y + 56), fill=(235, 25, 45))
 
@@ -338,7 +438,6 @@ def _generate_pick_card(row: dict) -> Path:
     play_word = "play" if play_count == 1 else "plays"
     draw.text((86, play_count_y), f"{play_count} {play_word}", font=_font(28, True), fill=green)
 
-    # Play rows
     row_x1 = 94
     row_x2 = width - 94
 
@@ -358,6 +457,7 @@ def _generate_pick_card(row: dict) -> Path:
         draw.text((row_x1 + 96, y + 21), fitted_label, font=fitted_font, fill=white)
 
     current_y = rows_top
+
     for play in plays:
         play_row(current_y, _play_label(play))
         current_y += row_h + row_gap
@@ -373,11 +473,11 @@ def _generate_pick_card(row: dict) -> Path:
         )
         draw.text((102, unit_y + 1), primary_unit, font=_font(19, True), fill=green)
 
-    # Banner aligned to play row width
     _paste_contain(img, BANNER_PATH, (row_x1, banner_top, row_x2, banner_top + banner_h))
 
     img = img.convert("RGB")
     img.save(GENERATED_CARD_PATH, quality=95)
+
     return GENERATED_CARD_PATH
 
 
@@ -424,21 +524,24 @@ def _post_card_to_discord(webhook_url: str, card_path: Path) -> requests.Respons
             files=files,
             timeout=30,
         )
+
     finally:
         for file_obj in open_files:
             file_obj.close()
 
 
-def _get_latest_row(sheet) -> dict | None:
-    records = sheet.get_all_records()
-    if not records:
-        return None
+def _ensure_posted_column(sheet, header_map: dict) -> int:
+    if "posted" in header_map:
+        return header_map["posted"]
 
-    for row in reversed(records):
-        if any(str(value or "").strip() for value in row.values()):
-            return row
+    next_col = len(header_map) + 1
+    sheet.update_cell(1, next_col, "POSTED")
+    return next_col
 
-    return None
+
+def _mark_posted(sheet, row_number: int, posted_col: int):
+    now = datetime.now(EST_TZ).strftime("%Y-%m-%d %I:%M %p EST")
+    sheet.update_cell(row_number, posted_col, now)
 
 
 def run_automation():
@@ -465,21 +568,40 @@ def run_automation():
 
     try:
         sheet = client.open_by_key(sheet_id).sheet1
-        row = _get_latest_row(sheet)
+        rows, row_numbers, header_map = _rows_from_sheet(sheet)
 
-        if not row:
+        if not rows:
             print("⚠️ Sheet is empty.")
             return
 
-        print(f"✅ Found data for: {row.get('Player 1')} vs {row.get('Player 2')}")
+        posted_col = _ensure_posted_column(sheet, header_map)
 
-        card_path = _generate_pick_card(row)
-        response = _post_card_to_discord(webhook_url, card_path)
+        for row, row_number in zip(rows, row_numbers):
+            posted_value = _get_value(row, "POSTED", fallback="").strip()
 
-        if response.status_code in (200, 204):
-            print("🚀 Success! Visual play card posted to Discord.")
-        else:
-            print(f"❌ Failed. Status: {response.status_code}, Response: {response.text}")
+            if posted_value:
+                continue
+
+            should_post, reason = _is_post_time(row)
+            print(f"Row {row_number}: {reason}")
+
+            if not should_post:
+                continue
+
+            print(f"✅ Posting play for: {row.get('Player 1')} vs {row.get('Player 2')}")
+
+            card_path = _generate_pick_card(row)
+            response = _post_card_to_discord(webhook_url, card_path)
+
+            if response.status_code in (200, 204):
+                _mark_posted(sheet, row_number, posted_col)
+                print("🚀 Success! Visual play card posted to Discord and row marked POSTED.")
+            else:
+                print(f"❌ Failed. Status: {response.status_code}, Response: {response.text}")
+
+            return
+
+        print("ℹ️ No eligible plays to post right now.")
 
     except Exception as e:
         print(f"❌ Python Error: {e}")
