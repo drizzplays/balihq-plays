@@ -212,78 +212,93 @@ def _generate_pick_card(row: dict) -> Path:
         plays[0].get("unit", "") or _get_value(row, "Unit", "Units", fallback="")
     )
 
-    width, height = 1200, 1320
+    width = 1200
     green = (124, 255, 0)
     white = (245, 245, 245)
     dark = (5, 8, 9)
 
+    # Layout measurements
+    outer_pad = 16
+    brand_top = 44
+    brand_logo_box = (54, 42, 100, 88)
+    top_right_logo_box = (935, 38, 1075, 130)
+
+    top_bar = (42, 110, 920, 200)
+
+    panel_top = 248
+    panel_left = 42
+    panel_right = 1118
+
+    rows_top = 435
+    row_height = 82
+    row_gap = 12
+
+    rows_bottom = rows_top + play_count * (row_height + row_gap) - row_gap
+    unit_box_top = rows_bottom + 8
+    unit_box_bottom = unit_box_top + 30
+    panel_bottom = unit_box_bottom + 20
+
+    banner_top = panel_bottom + 20
+    banner_height = 240
+    banner_bottom = banner_top + banner_height
+
+    height = banner_bottom + 40
+
     img = Image.new("RGBA", (width, height), (*dark, 255))
     draw = ImageDraw.Draw(img)
 
-    # Background texture
+    # background texture
     for x in range(0, width, 22):
         for y in range(0, height, 22):
             draw.ellipse((x, y, x + 2, y + 2), fill=(25, 42, 36, 80))
 
-    # Outer card
+    # outer border only - removed green side stripe
     _rounded_rect(
         draw,
-        (18, 16, width - 18, height - 16),
+        (outer_pad, outer_pad, width - outer_pad, height - outer_pad),
         18,
         fill=(8, 12, 13),
         outline=(46, 58, 58),
         width=2,
     )
-    draw.rectangle((18, 16, 26, height - 16), fill=green)
 
-    # Top brand row inside the card
-    _paste_contain(img, AVATAR_PATH, (60, 48, 105, 93))
-    draw.text((128, 48), BRAND_NAME, font=_font(30, True), fill=white)
-    _paste_contain(img, AVATAR_PATH, (940, 48, 1090, 145))
+    # brand row inside card
+    _paste_contain(img, AVATAR_PATH, brand_logo_box)
+    draw.text((118, brand_top), BRAND_NAME, font=_font(30, True), fill=white)
+    _paste_contain(img, AVATAR_PATH, top_right_logo_box)
 
-    # Top time + matchup bar with inside logo preserved
-    bar = (58, 120, 930, 220)
-
+    # top bar
     glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
-    gd.rounded_rectangle(bar, radius=16, outline=green, width=5)
+    gd.rounded_rectangle(top_bar, radius=16, outline=green, width=5)
     glow = glow.filter(ImageFilter.GaussianBlur(6))
     img.alpha_composite(glow)
 
-    _rounded_rect(draw, bar, 16, fill=(8, 13, 14), outline=green, width=2)
+    _rounded_rect(draw, top_bar, 16, fill=(8, 13, 14), outline=green, width=2)
 
-    _draw_clock(draw, 82, 138)
+    _draw_clock(draw, 68, 126)
 
     time_text, time_font = _fit_text(draw, est, 150, 34, True, 24)
-    draw.text((170, 134), time_text, font=time_font, fill=white)
-    draw.text((180, 176), "EST", font=_font(22, True), fill=green)
-
-    draw.line((300, 136, 300, 202), fill=(125, 138, 138), width=2)
+    draw.text((156, 122), time_text, font=time_font, fill=white)
+    draw.text((166, 164), "EST", font=_font(22, True), fill=green)
+    draw.line((286, 124, 286, 186), fill=(125, 138, 138), width=2)
 
     matchup = f"{player_1} vs {player_2}"
-    matchup_text, matchup_font = _fit_text(draw, matchup, 530, 27, True, 18)
+    matchup_text, matchup_font = _fit_text(draw, matchup, 510, 27, True, 18)
 
     if " vs " in matchup_text and not matchup_text.endswith("..."):
         p1, p2 = matchup_text.split(" vs ", 1)
         p1_w = _text_width(draw, p1 + " ", matchup_font)
         vs_w = _text_width(draw, "vs ", matchup_font)
 
-        draw.text((330, 151), p1 + " ", font=matchup_font, fill=white)
-        draw.text((330 + p1_w, 151), "vs ", font=matchup_font, fill=green)
-        draw.text((330 + p1_w + vs_w, 151), p2, font=matchup_font, fill=white)
+        draw.text((316, 139), p1 + " ", font=matchup_font, fill=white)
+        draw.text((316 + p1_w, 139), "vs ", font=matchup_font, fill=green)
+        draw.text((316 + p1_w + vs_w, 139), p2, font=matchup_font, fill=white)
     else:
-        draw.text((330, 151), matchup_text, font=matchup_font, fill=white)
+        draw.text((316, 139), matchup_text, font=matchup_font, fill=white)
 
-    # Dynamic panel sizing
-    panel_top = 270
-    rows_top = 455
-    row_height = 82
-    row_gap = 12
-    rows_bottom = rows_top + play_count * (row_height + row_gap) - row_gap
-    unit_box_top = rows_bottom + 6
-    panel_bottom = unit_box_top + 36 + 10
-
-    panel_box = (58, panel_top, 1142, panel_bottom)
+    # main play panel
+    panel_box = (panel_left, panel_top, panel_right, panel_bottom)
 
     glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
@@ -293,32 +308,30 @@ def _generate_pick_card(row: dict) -> Path:
 
     _rounded_rect(draw, panel_box, 22, fill=(6, 12, 13), outline=green, width=2)
 
-    # League header
-    draw.rectangle((116, 320, 210, 390), fill=(235, 235, 235))
-    draw.rectangle((116, 355, 210, 390), fill=(235, 25, 45))
+    # league header
+    draw.rectangle((96, 312, 190, 382), fill=(235, 235, 235))
+    draw.rectangle((96, 347, 190, 382), fill=(235, 25, 45))
 
     league_text, league_font = _fit_text(draw, league.upper(), 650, 46, True, 30)
-    draw.text((252, 330), league_text, font=league_font, fill=white)
-    draw.line((250, 420, 680, 420), fill=green, width=3)
-    draw.line((680, 420, 730, 385), fill=green, width=3)
+    draw.text((230, 322), league_text, font=league_font, fill=white)
+    draw.line((228, 412, 660, 412), fill=green, width=3)
+    draw.line((660, 412, 710, 377), fill=green, width=3)
 
     play_word = "play" if play_count == 1 else "plays"
-    draw.text((116, 445), f"{play_count} {play_word}", font=_font(30, True), fill=green)
+    draw.text((96, 438), f"{play_count} {play_word}", font=_font(30, True), fill=green)
 
     def play_row(y: int, label: str):
         _rounded_rect(
             draw,
-            (106, y, 1058, y + row_height),
+            (90, y, 1040, y + row_height),
             10,
             fill=(10, 15, 16),
             outline=(48, 60, 60),
             width=1,
         )
-
-        _draw_check(draw, 138, y + 8)
-
+        _draw_check(draw, 122, y + 8)
         fitted_label, fitted_font = _fit_text(draw, label, 740, 30, True, 20)
-        draw.text((250, y + 23), fitted_label, font=fitted_font, fill=white)
+        draw.text((234, y + 23), fitted_label, font=fitted_font, fill=white)
 
     current_y = rows_top
     for play in plays:
@@ -328,22 +341,16 @@ def _generate_pick_card(row: dict) -> Path:
     if primary_unit:
         _rounded_rect(
             draw,
-            (96, unit_box_top, 190, unit_box_top + 30),
+            (84, unit_box_top, 178, unit_box_bottom),
             4,
             fill=(11, 20, 16),
             outline=green,
             width=2,
         )
-        draw.text((116, unit_box_top + 2), primary_unit, font=_font(22, True), fill=green)
+        draw.text((104, unit_box_top + 2), primary_unit, font=_font(22, True), fill=green)
 
-    banner_top = panel_bottom + 18
-    _paste_contain(img, BANNER_PATH, (80, banner_top, 1082, banner_top + 240))
-
-    # Footer inside generated card
-    footer_y = height - 64
-    draw.line((110, footer_y - 10, 1088, footer_y - 10), fill=(42, 55, 55), width=1)
-    _paste_contain(img, AVATAR_PATH, (70, footer_y, 104, footer_y + 34))
-    draw.text((126, footer_y + 2), BRAND_NAME, font=_font(22, True), fill=white)
+    # banner
+    _paste_contain(img, BANNER_PATH, (140, banner_top, 940, banner_bottom))
 
     img = img.convert("RGB")
     img.save(GENERATED_CARD_PATH, quality=95)
@@ -357,7 +364,7 @@ def _build_embed_payload(card_file_name: str, avatar_file_name: str | None = Non
         "footer": {"text": BRAND_NAME},
     }
 
-    # No author, no title, no thumbnail, no top text
+    # no author, no title, no thumbnail, keep only footer
     if avatar_file_name:
         avatar_url = f"attachment://{avatar_file_name}"
         embed["footer"]["icon_url"] = avatar_url
