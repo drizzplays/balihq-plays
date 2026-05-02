@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import json
+import re
 import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -44,8 +45,10 @@ def _rows_from_sheet(sheet):
     seen = {}
     headers = []
 
-    # Handles duplicate headers like BET / Unit / History by renaming the second set:
-    # BET -> BET, second BET -> BET 2
+    # Supports duplicate headers in Google Sheets:
+    # BET | Unit | History | BET | Unit | History
+    # becomes:
+    # BET | Unit | History | BET 2 | Unit 2 | History 2
     for header in raw_headers:
         if not header:
             headers.append("")
@@ -75,7 +78,8 @@ def _rows_from_sheet(sheet):
         rows.append(row)
         row_numbers.append(index)
 
-    return rows, row_numbers, {h.lower(): i + 1 for i, h in enumerate(headers) if h}
+    header_map = {h.lower(): i + 1 for i, h in enumerate(headers) if h}
+    return rows, row_numbers, header_map
 
 
 def _normalize_row(row: dict) -> dict:
@@ -88,7 +92,6 @@ def _get_value(row: dict, *keys: str, fallback: str = "N/A") -> str:
     for key in keys:
         value = normalized.get(key.strip().lower())
         value = str(value or "").strip()
-
         if value:
             return value
 
@@ -97,21 +100,33 @@ def _get_value(row: dict, *keys: str, fallback: str = "N/A") -> str:
 
 def _parse_est_datetime(row: dict) -> datetime | None:
     est_text = _get_value(row, "EST", fallback="").strip()
-
     if not est_text:
         return None
+
+    clean = est_text.upper().replace("EST", "").replace("EDT", "").strip()
+    clean = re.sub(r"\s+", " ", clean)
 
     today = datetime.now(EST_TZ).date()
 
     formats = [
         "%I:%M %p",
         "%I:%M%p",
+        "%I %p",
+        "%I%p",
         "%H:%M",
     ]
 
     for fmt in formats:
         try:
-            parsed_time = datetime.strptime(est_text.upper().replace(" ", ""), fmt.replace(" ", "")).time()
+            parsed_time = datetime.strptime(clean, fmt).time()
+            return datetime.combine(today, parsed_time, tzinfo=EST_TZ)
+        except ValueError:
+            continue
+
+    compact = clean.replace(" ", "")
+    for fmt in ["%I:%M%p", "%I%p"]:
+        try:
+            parsed_time = datetime.strptime(compact, fmt).time()
             return datetime.combine(today, parsed_time, tzinfo=EST_TZ)
         except ValueError:
             continue
@@ -126,25 +141,28 @@ def _is_post_time(row: dict) -> tuple[bool, str]:
         return False, "Missing or invalid EST time"
 
     now = datetime.now(EST_TZ)
-    start = play_time - timedelta(minutes=POST_WINDOW_MINUTES)
+    post_at = play_time - timedelta(minutes=POST_WINDOW_MINUTES)
 
-    if start <= now <= play_time:
-        return True, f"Inside post window: {start.strftime('%I:%M %p')} - {play_time.strftime('%I:%M %p')} EST"
+    if post_at <= now <= play_time:
+        return True, (
+            f"Inside EST post window: "
+            f"{post_at.strftime('%I:%M %p')} - {play_time.strftime('%I:%M %p')} EST"
+        )
 
-    return False, f"Not time yet. Now: {now.strftime('%I:%M %p')} EST | Post at: {start.strftime('%I:%M %p')} EST"
+    return False, (
+        f"Not time yet. "
+        f"Now: {now.strftime('%I:%M %p')} EST | "
+        f"Post window: {post_at.strftime('%I:%M %p')} - {play_time.strftime('%I:%M %p')} EST"
+    )
 
 
 def _font(size: int, bold: bool = False):
-    font_paths = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        if bold
-        else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
-        if bold
-        else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+    paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
     ]
 
-    for path in font_paths:
+    for path in paths:
         if Path(path).exists():
             return ImageFont.truetype(path, size)
 
@@ -166,7 +184,6 @@ def _fit_text(draw: ImageDraw.ImageDraw, text: str, max_width: int, size: int, b
 
     font = _font(min_size, bold)
     ellipsis = "..."
-
     while len(text) > 3 and _text_width(draw, text + ellipsis, font) > max_width:
         text = text[:-1]
 
@@ -191,35 +208,26 @@ def _paste_contain(canvas: Image.Image, image_path: Path, box: tuple[int, int, i
     canvas.alpha_composite(img, (x, y))
 
 
+def _draw_soft_glow(base: Image.Image, box, radius: int, color=(124, 255, 0, 100), border=4):
+    glow = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    gd.rounded_rectangle(box, radius=radius, outline=color, width=border)
+    glow = glow.filter(ImageFilter.GaussianBlur(8))
+    base.alpha_composite(glow)
+
+
 def _draw_check(draw: ImageDraw.ImageDraw, x: int, y: int):
     green = (124, 255, 0)
-
-    _rounded_rect(
-        draw,
-        (x, y, x + 56, y + 56),
-        12,
-        fill=green,
-        outline=(185, 255, 130),
-        width=2,
-    )
+    _rounded_rect(draw, (x, y, x + 56, y + 56), 12, fill=green, outline=(185, 255, 130), width=2)
     draw.line((x + 14, y + 31, x + 24, y + 41), fill=(255, 255, 255), width=7)
     draw.line((x + 24, y + 41, x + 43, y + 17), fill=(255, 255, 255), width=7)
 
 
 def _draw_clock(draw: ImageDraw.ImageDraw, x: int, y: int):
     green = (124, 255, 0)
-
     draw.ellipse((x, y, x + 52, y + 52), outline=green, width=4)
     draw.line((x + 26, y + 10, x + 26, y + 28), fill=green, width=4)
     draw.line((x + 26, y + 28, x + 40, y + 38), fill=green, width=4)
-
-
-def _draw_soft_glow(base: Image.Image, box, radius: int, color=(124, 255, 0, 110), border=4):
-    glow = Image.new("RGBA", base.size, (0, 0, 0, 0))
-    gd = ImageDraw.Draw(glow)
-    gd.rounded_rectangle(box, radius=radius, outline=color, width=border)
-    glow = glow.filter(ImageFilter.GaussianBlur(8))
-    base.alpha_composite(glow)
 
 
 def _collect_plays(row: dict) -> list[dict]:
@@ -234,7 +242,6 @@ def _collect_plays(row: dict) -> list[dict]:
         return ""
 
     first_bet = get_any("bet")
-
     if first_bet:
         plays.append(
             {
@@ -245,48 +252,20 @@ def _collect_plays(row: dict) -> list[dict]:
         )
 
     for i in range(2, 9):
-        bet = get_any(
-            f"bet {i}",
-            f"bet{i}",
-            f"bet_{i}",
-            f"play {i}",
-            f"play{i}",
-            f"play_{i}",
-        )
-
+        bet = get_any(f"bet {i}", f"bet{i}", f"bet_{i}", f"play {i}", f"play{i}", f"play_{i}")
         if not bet:
             continue
 
         plays.append(
             {
                 "bet": bet,
-                "history": get_any(
-                    f"history {i}",
-                    f"history{i}",
-                    f"history_{i}",
-                    f"unit history {i}",
-                    f"unit history{i}",
-                    f"unit_history_{i}",
-                ),
-                "unit": get_any(
-                    f"unit {i}",
-                    f"unit{i}",
-                    f"unit_{i}",
-                    f"units {i}",
-                    f"units{i}",
-                    f"units_{i}",
-                ),
+                "history": get_any(f"history {i}", f"history{i}", f"history_{i}", f"unit history {i}", f"unit history{i}", f"unit_history_{i}"),
+                "unit": get_any(f"unit {i}", f"unit{i}", f"unit_{i}", f"units {i}", f"units{i}", f"units_{i}"),
             }
         )
 
     if not plays:
-        plays.append(
-            {
-                "bet": "No Bet Found",
-                "history": "",
-                "unit": get_any("unit", "units"),
-            }
-        )
+        plays.append({"bet": "No Bet Found", "history": "", "unit": get_any("unit", "units")})
 
     return plays
 
@@ -303,10 +282,8 @@ def _play_label(play: dict) -> str:
 
 def _format_unit(unit: str) -> str:
     unit = str(unit or "").strip()
-
     if not unit:
         return ""
-
     return unit if unit.lower().endswith("u") else f"{unit}u"
 
 
@@ -318,16 +295,13 @@ def _generate_pick_card(row: dict) -> Path:
 
     plays = _collect_plays(row)
     play_count = len(plays)
-
-    primary_unit = _format_unit(
-        plays[0].get("unit", "") or _get_value(row, "Unit", "Units", fallback="")
-    )
+    primary_unit = _format_unit(plays[0].get("unit", "") or _get_value(row, "Unit", "Units", fallback=""))
 
     width = 1200
 
     green = (124, 255, 0)
     white = (245, 245, 245)
-    dark_bg = (6, 10, 12)
+    dark_bg = (4, 8, 9)
     card_fill = (7, 12, 14)
     top_fill = (9, 15, 16)
     panel_fill = (6, 12, 13)
@@ -335,10 +309,6 @@ def _generate_pick_card(row: dict) -> Path:
     line_soft = (43, 54, 56)
     border_soft = (52, 62, 64)
     accent_grey = (120, 130, 134)
-
-    outer_pad = 22
-    card_x1 = outer_pad
-    card_x2 = width - outer_pad
 
     brand_top = 34
     top_bar_top = 112
@@ -369,25 +339,21 @@ def _generate_pick_card(row: dict) -> Path:
     img = Image.new("RGBA", (width, height), (*dark_bg, 255))
     draw = ImageDraw.Draw(img)
 
+    # Dotted texture
     for x in range(0, width, 26):
         for y in range(0, height, 26):
             draw.ellipse((x, y, x + 2, y + 2), fill=(18, 30, 31, 95))
 
-    _rounded_rect(
-        draw,
-        (card_x1, 16, card_x2, height - 16),
-        22,
-        fill=card_fill,
-        outline=border_soft,
-        width=2,
-    )
+    # Outer card
+    _rounded_rect(draw, (22, 16, width - 22, height - 16), 22, fill=card_fill, outline=border_soft, width=2)
 
+    # Brand row
     _paste_contain(img, AVATAR_PATH, (44, brand_top, 92, brand_top + 48))
     draw.text((106, brand_top - 1), BRAND_NAME, font=_font(30, True), fill=white)
     _paste_contain(img, AVATAR_PATH, (972, 26, 1088, 126))
 
+    # Top matchup card
     top_bar = (top_bar_x1, top_bar_top, top_bar_x2, top_bar_top + top_bar_h)
-
     _draw_soft_glow(img, top_bar, radius=18)
     _rounded_rect(draw, top_bar, 18, fill=top_fill, outline=green, width=2)
 
@@ -397,11 +363,7 @@ def _generate_pick_card(row: dict) -> Path:
     draw.text((132, top_bar_top + 16), time_text, font=time_font, fill=white)
     draw.text((142, top_bar_top + 50), "EST", font=_font(18, True), fill=green)
 
-    draw.line(
-        (246, top_bar_top + 16, 246, top_bar_top + top_bar_h - 16),
-        fill=accent_grey,
-        width=2,
-    )
+    draw.line((246, top_bar_top + 16, 246, top_bar_top + top_bar_h - 16), fill=accent_grey, width=2)
 
     matchup = f"{player_1} vs {player_2}"
     matchup_text, matchup_font = _fit_text(draw, matchup, 590, 22, True, 16)
@@ -410,21 +372,19 @@ def _generate_pick_card(row: dict) -> Path:
         p1, p2 = matchup_text.split(" vs ", 1)
         p1_w = _text_width(draw, p1 + " ", matchup_font)
         vs_w = _text_width(draw, "vs ", matchup_font)
-
         draw.text((274, top_bar_top + 34), p1 + " ", font=matchup_font, fill=white)
         draw.text((274 + p1_w, top_bar_top + 34), "vs ", font=matchup_font, fill=green)
         draw.text((274 + p1_w + vs_w, top_bar_top + 34), p2, font=matchup_font, fill=white)
     else:
         draw.text((274, top_bar_top + 34), matchup_text, font=matchup_font, fill=white)
 
+    # Main panel
     panel_box = (panel_x1, panel_top, panel_x2, panel_bottom)
-
     _draw_soft_glow(img, panel_box, radius=24)
     _rounded_rect(draw, panel_box, 24, fill=panel_fill, outline=green, width=2)
 
     flag_x = 86
     flag_y = league_top + 8
-
     draw.rectangle((flag_x, flag_y, flag_x + 76, flag_y + 56), fill=(235, 235, 235))
     draw.rectangle((flag_x, flag_y + 28, flag_x + 76, flag_y + 56), fill=(235, 25, 45))
 
@@ -442,42 +402,24 @@ def _generate_pick_card(row: dict) -> Path:
     row_x2 = width - 94
 
     def play_row(y: int, label: str):
-        _rounded_rect(
-            draw,
-            (row_x1, y, row_x2, y + row_h),
-            12,
-            fill=row_fill,
-            outline=line_soft,
-            width=1,
-        )
-
+        _rounded_rect(draw, (row_x1, y, row_x2, y + row_h), 12, fill=row_fill, outline=line_soft, width=1)
         _draw_check(draw, row_x1 + 20, y + 11)
-
         fitted_label, fitted_font = _fit_text(draw, label, 780, 28, True, 18)
         draw.text((row_x1 + 96, y + 21), fitted_label, font=fitted_font, fill=white)
 
     current_y = rows_top
-
     for play in plays:
         play_row(current_y, _play_label(play))
         current_y += row_h + row_gap
 
     if primary_unit:
-        _rounded_rect(
-            draw,
-            (86, unit_y, 148, unit_y + 28),
-            4,
-            fill=(11, 20, 16),
-            outline=green,
-            width=2,
-        )
+        _rounded_rect(draw, (86, unit_y, 148, unit_y + 28), 4, fill=(11, 20, 16), outline=green, width=2)
         draw.text((102, unit_y + 1), primary_unit, font=_font(19, True), fill=green)
 
     _paste_contain(img, BANNER_PATH, (row_x1, banner_top, row_x2, banner_top + banner_h))
 
     img = img.convert("RGB")
     img.save(GENERATED_CARD_PATH, quality=95)
-
     return GENERATED_CARD_PATH
 
 
@@ -494,9 +436,7 @@ def _build_embed_payload(card_file_name: str, avatar_file_name: str | None = Non
 
     return {
         "content": f"<@&{ROLE_ID}>",
-        "allowed_mentions": {
-            "roles": [ROLE_ID],
-        },
+        "allowed_mentions": {"roles": [ROLE_ID]},
         "embeds": [embed],
     }
 
@@ -518,12 +458,7 @@ def _post_card_to_discord(webhook_url: str, card_path: Path) -> requests.Respons
             open_files.append(avatar_file)
             files.append(("files[1]", (AVATAR_PATH.name, avatar_file, "image/png")))
 
-        return requests.post(
-            webhook_url,
-            data={"payload_json": json.dumps(payload)},
-            files=files,
-            timeout=30,
-        )
+        return requests.post(webhook_url, data={"payload_json": json.dumps(payload)}, files=files, timeout=30)
 
     finally:
         for file_obj in open_files:
@@ -534,7 +469,7 @@ def _ensure_posted_column(sheet, header_map: dict) -> int:
     if "posted" in header_map:
         return header_map["posted"]
 
-    next_col = len(header_map) + 1
+    next_col = max(header_map.values(), default=0) + 1
     sheet.update_cell(1, next_col, "POSTED")
     return next_col
 
