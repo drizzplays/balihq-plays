@@ -1,59 +1,168 @@
 import os
+from pathlib import Path
+import json
+
 import gspread
 from google.oauth2.service_account import Credentials
 import requests
-import json
+
+
+DISCORD_EMBED_COLOR = 0x7CFF00
+BASE_DIR = Path(__file__).resolve().parent
+IMAGES_DIR = BASE_DIR / "images"
+AVATAR_PATH = IMAGES_DIR / "avatar.png"
+BANNER_PATH = IMAGES_DIR / "banner.png"
+BRAND_NAME = "SHEETWAGERS"
+
+
+# Replace this with your real Google Sheet ID or set GOOGLE_SHEET_ID in GitHub Secrets.
+DEFAULT_SHEET_ID = "12jKPYa58oYAOyfj8FP5v6VrMZe4gVybR7zSq1T4bkBE"
+
+
+def _clean(value, fallback="N/A"):
+    value = str(value or "").strip()
+    return value if value else fallback
+
+
+def _build_embed_payload(row: dict, avatar_file_name: str | None = None, banner_file_name: str | None = None) -> dict:
+    league = _clean(row.get("LEAGUE"), "Bet")
+    est = _clean(row.get("EST"))
+    pst = _clean(row.get("PST"))
+    player_1 = _clean(row.get("Player 1"), "TBD")
+    player_2 = _clean(row.get("Player 2"), "TBD")
+    bet = _clean(row.get("BET"), "No Bet Found")
+    history = _clean(row.get("Unit History"))
+
+    embed: dict = {
+        "color": DISCORD_EMBED_COLOR,
+        "author": {
+            "name": BRAND_NAME,
+        },
+        "title": f"🏆 NEW {league} ALERT 🏆",
+        "description": "━━━━━━━━━━━━━━━━━━━━",
+        "fields": [
+            {
+                "name": "⏰ Time",
+                "value": f"{est} EST | {pst} PST",
+                "inline": False,
+            },
+            {
+                "name": "👤 Matchup",
+                "value": f"{player_1} vs {player_2}",
+                "inline": False,
+            },
+            {
+                "name": "🔥 BET",
+                "value": bet,
+                "inline": False,
+            },
+            {
+                "name": "📈 History",
+                "value": history,
+                "inline": False,
+            },
+        ],
+        "footer": {
+            "text": BRAND_NAME,
+        },
+    }
+
+    if avatar_file_name:
+        avatar_url = f"attachment://{avatar_file_name}"
+        embed["author"]["icon_url"] = avatar_url
+        embed["thumbnail"] = {"url": avatar_url}
+        embed["footer"]["icon_url"] = avatar_url
+
+    if banner_file_name:
+        embed["image"] = {"url": f"attachment://{banner_file_name}"}
+
+    return {
+        "content": "",
+        "embeds": [embed],
+    }
+
+
+def _post_embed_to_discord(webhook_url: str, payload: dict) -> requests.Response:
+    files = []
+    open_files = []
+
+    try:
+        if AVATAR_PATH.exists():
+            avatar_file = AVATAR_PATH.open("rb")
+            open_files.append(avatar_file)
+            files.append(("files[0]", (AVATAR_PATH.name, avatar_file, "image/png")))
+
+        if BANNER_PATH.exists():
+            banner_file = BANNER_PATH.open("rb")
+            open_files.append(banner_file)
+            files.append(("files[1]", (BANNER_PATH.name, banner_file, "image/png")))
+
+        if files:
+            return requests.post(
+                webhook_url,
+                data={"payload_json": json.dumps(payload)},
+                files=files,
+                timeout=30,
+            )
+
+        return requests.post(webhook_url, json=payload, timeout=30)
+
+    finally:
+        for file_obj in open_files:
+            file_obj.close()
+
 
 def run_automation():
     creds_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
     webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
-    
+    sheet_id = os.getenv("GOOGLE_SHEET_ID", DEFAULT_SHEET_ID)
+
     if not creds_json or not webhook_url:
         print("❌ Error: Missing Environment Variables")
         return
 
-    scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    if not sheet_id or sheet_id == "YOUR_SHEET_ID_HERE":
+        print("❌ Error: Missing Google Sheet ID. Set GOOGLE_SHEET_ID in GitHub Secrets or edit DEFAULT_SHEET_ID.")
+        return
+
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ]
+
     creds_data = json.loads(creds_json)
     creds = Credentials.from_service_account_info(creds_data, scopes=scopes)
     client = gspread.authorize(creds)
 
     try:
         # 1. Open the Sheet
-        # Replace the ID below with your actual Google Sheet ID
-        sheet_id = "12jKPYa58oYAOyfj8FP5v6VrMZe4gVybR7zSq1T4bkBE" 
         sheet = client.open_by_key(sheet_id).sheet1
-        
+
         # 2. Get the latest row
         records = sheet.get_all_records()
         if not records:
             print("⚠️ Sheet is empty.")
             return
-            
-        row = records[-1] # The most recent entry
+
+        row = records[-1]
         print(f"✅ Found data for: {row.get('Player 1')} vs {row.get('Player 2')}")
 
-        # 3. Format the Message using your specific headers
-        message_content = (
-            f"🏆 **NEW {row.get('LEAGUE', 'Bet')} ALERT** 🏆\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"⏰ **Time:** {row.get('EST', 'N/A')} EST | {row.get('PST', 'N/A')} PST\n"
-            f"👤 **Matchup:** {row.get('Player 1', 'TBD')} vs {row.get('Player 2', 'TBD')}\n"
-            f"🔥 **BET:** {row.get('BET', 'No Bet Found')}\n"
-            f"📈 **History:** {row.get('Unit History', 'N/A')}\n"
-            f"━━━━━━━━━━━━━━━━━━━━"
-        )
+        # 3. Build the Discord embed
+        avatar_file_name = AVATAR_PATH.name if AVATAR_PATH.exists() else None
+        banner_file_name = BANNER_PATH.name if BANNER_PATH.exists() else None
+        payload = _build_embed_payload(row, avatar_file_name, banner_file_name)
 
         # 4. Send to Discord Webhook
-        payload = {"content": message_content}
-        response = requests.post(webhook_url, json=payload)
-        
-        if response.status_code == 204:
-            print("🚀 Success! Play posted to Discord.")
+        response = _post_embed_to_discord(webhook_url, payload)
+
+        if response.status_code in (200, 204):
+            print("🚀 Success! Play posted to Discord as an embed.")
         else:
             print(f"❌ Failed. Status: {response.status_code}, Response: {response.text}")
 
     except Exception as e:
         print(f"❌ Python Error: {e}")
+
 
 if __name__ == "__main__":
     run_automation()
