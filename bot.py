@@ -286,7 +286,6 @@ def _draw_clock(draw: ImageDraw.ImageDraw, x: int, y: int):
 
 def _collect_plays(row: dict) -> list[dict]:
     normalized = _normalize_row(row)
-    plays = []
 
     def get_any(*names: str) -> str:
         for name in names:
@@ -295,33 +294,20 @@ def _collect_plays(row: dict) -> list[dict]:
                 return value
         return ""
 
-    first_bet = get_any("bet")
-    if first_bet:
-        plays.append(
-            {
-                "bet": first_bet,
-                "history": get_any("history", "unit history"),
-                "unit": get_any("unit", "units"),
-            }
-        )
+    # Only use the primary/first bet from the row.
+    # This intentionally ignores BET 2, BET 3, PLAY 2, etc. so the card posts one official play only.
+    first_bet = get_any("bet", "play")
 
-    for i in range(2, 9):
-        bet = get_any(f"bet {i}", f"bet{i}", f"bet_{i}", f"play {i}", f"play{i}", f"play_{i}")
-        if not bet:
-            continue
+    if not first_bet:
+        return [{"bet": "No Bet Found", "history": "", "unit": get_any("unit", "units")} ]
 
-        plays.append(
-            {
-                "bet": bet,
-                "history": get_any(f"history {i}", f"history{i}", f"history_{i}", f"unit history {i}", f"unit history{i}", f"unit_history_{i}"),
-                "unit": get_any(f"unit {i}", f"unit{i}", f"unit_{i}", f"units {i}", f"units{i}", f"units_{i}"),
-            }
-        )
-
-    if not plays:
-        plays.append({"bet": "No Bet Found", "history": "", "unit": get_any("unit", "units")})
-
-    return plays
+    return [
+        {
+            "bet": first_bet,
+            "history": get_any("history", "unit history"),
+            "unit": get_any("unit", "units"),
+        }
+    ]
 
 
 def _play_label(play: dict) -> str:
