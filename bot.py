@@ -16,7 +16,7 @@ except ImportError as exc:
     raise RuntimeError("Pillow is required. Add pillow to requirements.txt") from exc
 
 
-DISCORD_EMBED_COLOR = 0x3498DB
+DISCORD_EMBED_COLOR = 0x7CFF00
 ROLE_ID = "1500237161335881768"
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -341,7 +341,7 @@ def _league_icon_path(league: str) -> Path | None:
 
 
 def _draw_league_chip(img: Image.Image, draw: ImageDraw.ImageDraw, box, league: str, text_color=(246, 247, 248)):
-    _draw_glossy_panel(img, box, 16, (20, 29, 36, 255), (8, 13, 18, 255), outline=(72, 111, 161), inner_outline=(255, 255, 255, 10), gloss_alpha=32)
+    _draw_glossy_panel(img, box, 16, (22, 32, 38, 255), (8, 13, 18, 255), outline=(45, 60, 68), inner_outline=(255, 255, 255, 10), gloss_alpha=32)
 
     icon_path = _league_icon_path(league)
     text_x = box[0] + 16
@@ -488,19 +488,19 @@ def _unit_display(unit: str) -> str:
 
 
 def _draw_check(draw: ImageDraw.ImageDraw, x: int, y: int):
-    blue = (84, 170, 255)
-    _rounded_rect(draw, (x, y, x + 48, y + 48), 14, fill=(15, 24, 34), outline=(78, 128, 184), width=2)
+    green = (132, 255, 55)
+    _rounded_rect(draw, (x, y, x + 48, y + 48), 14, fill=(18, 29, 22), outline=(96, 160, 78), width=2)
     draw.rounded_rectangle((x + 1, y + 1, x + 47, y + 47), radius=13, outline=(255, 255, 255, 14), width=1)
-    draw.line((x + 12, y + 25, x + 21, y + 34), fill=blue, width=6)
-    draw.line((x + 20, y + 34, x + 36, y + 15), fill=blue, width=6)
+    draw.line((x + 12, y + 25, x + 21, y + 34), fill=green, width=6)
+    draw.line((x + 20, y + 34, x + 36, y + 15), fill=green, width=6)
 
 
 def _draw_clock(draw: ImageDraw.ImageDraw, x: int, y: int):
-    blue = (84, 170, 255)
-    draw.ellipse((x, y, x + 46, y + 46), fill=(10, 19, 31), outline=blue, width=3)
+    green = (132, 255, 55)
+    draw.ellipse((x, y, x + 46, y + 46), fill=(12, 24, 18), outline=green, width=3)
     draw.ellipse((x + 2, y + 2, x + 44, y + 44), outline=(255, 255, 255, 12), width=1)
-    draw.line((x + 23, y + 10, x + 23, y + 24), fill=blue, width=3)
-    draw.line((x + 23, y + 24, x + 33, y + 31), fill=blue, width=3)
+    draw.line((x + 23, y + 10, x + 23, y + 24), fill=green, width=3)
+    draw.line((x + 23, y + 24, x + 33, y + 31), fill=green, width=3)
 
 
 def _iter_numbered_values(normalized: dict, base_names: tuple[str, ...], max_items: int = 10) -> list[str]:
@@ -687,7 +687,7 @@ def _draw_market_banner(img: Image.Image, banner_frame: tuple[int, int, int, int
         )
         return
 
-    green = (84, 170, 255)
+    green = (132, 255, 55)
     dark = (7, 13, 15)
 
     _rounded_rect(draw, banner_frame, 22, fill=(11, 17, 20), outline=(55, 73, 80), width=1)
@@ -744,7 +744,7 @@ def _draw_market_banner(img: Image.Image, banner_frame: tuple[int, int, int, int
             cx, cy = inner[0] + 108, inner[1] + 155
             handle = (cx + 34, cy + 58, cx + 72, cy + 126)
             ball = (inner[0] + 86, inner[3] - 74, inner[0] + 130, inner[3] - 30)
-            paddle_fill = (84, 170, 255) if market_type == "live" else (202, 18, 25)
+            paddle_fill = (124, 255, 0) if market_type == "live" else (202, 18, 25)
         else:
             cx, cy = inner[2] - 108, inner[1] + 155
             handle = (cx - 72, cy + 58, cx - 34, cy + 126)
@@ -779,7 +779,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     width = 1200
     outer_pad = 26
 
-    green = (84, 170, 255)
+    green = (132, 255, 55)
     white = (246, 248, 250)
     off_white = (184, 193, 200)
     muted = (111, 123, 132)
@@ -854,10 +854,10 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     # matchup
     hero = (left + 14, hero_y, right - 14, hero_y + hero_h)
     _draw_drop_shadow(img, hero, radius=24, offset=(0, 10), blur=20, alpha=78)
-    _draw_glossy_panel(img, hero, 24, (13, 19, 23, 255), (6, 10, 13, 255), outline=(78, 118, 166), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
+    _draw_glossy_panel(img, hero, 24, (13, 19, 23, 255), (6, 10, 13, 255), outline=(80, 132, 82), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
 
     time_pill = (hero[0] + 18, hero[1] + 16, hero[0] + 304, hero[1] + 74)
-    _draw_glossy_panel(img, time_pill, 18, (18, 29, 42, 255), (9, 15, 24, 255), outline=(72, 111, 161), inner_outline=(255, 255, 255, 10), gloss_alpha=20)
+    _draw_glossy_panel(img, time_pill, 18, (24, 37, 27, 255), (11, 18, 14, 255), outline=(76, 118, 74), inner_outline=(255, 255, 255, 10), gloss_alpha=20)
     _draw_clock(draw, time_pill[0] + 16, time_pill[1] + 6)
     clean_est = str(est).upper().replace("EST", "").replace("EDT", "").strip() or est
     time_text, time_font = _fit_text(draw, clean_est, 168, 24, True, 18)
@@ -900,7 +900,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         unit_text_w = _text_width(draw, primary_unit, _font(18, True))
         unit_chip_w = max(200, unit_text_w + 72)
         unit_chip = (board[2] - 20 - unit_chip_w, top_y, board[2] - 20, top_y + chip_h)
-        _draw_glossy_panel(img, unit_chip, 16, (18, 29, 42, 255), (9, 15, 24, 255), outline=(72, 111, 161), inner_outline=(255, 255, 255, 10), gloss_alpha=18)
+        _draw_glossy_panel(img, unit_chip, 16, (24, 37, 27, 255), (11, 18, 14, 255), outline=(70, 104, 70), inner_outline=(255, 255, 255, 10), gloss_alpha=18)
         _draw_text_vcenter(draw, unit_chip, primary_unit, _font(18, True), green, x=unit_chip[0] + ((unit_chip[2] - unit_chip[0]) - unit_text_w) / 2)
 
     section_y = board_y + 72
@@ -929,8 +929,8 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         if single_moneyline_layout:
             # simplified premium single-moneyline row
             check_wrap = (row_box[0] + 18, row_box[1] + 23, row_box[0] + 66, row_box[1] + 71)
-            _draw_glossy_panel(img, check_wrap, 15, (18, 29, 42, 255), (9, 15, 24, 255), outline=(72, 111, 161), inner_outline=(255, 255, 255, 8), gloss_alpha=10)
-            green_check = (84, 170, 255)
+            _draw_glossy_panel(img, check_wrap, 15, (24, 37, 27, 255), (11, 18, 14, 255), outline=(64, 98, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=10)
+            green_check = (132, 255, 55)
             draw.line((check_wrap[0] + 14, check_wrap[1] + 26, check_wrap[0] + 22, check_wrap[1] + 34), fill=green_check, width=6)
             draw.line((check_wrap[0] + 22, check_wrap[1] + 34, check_wrap[0] + 34, check_wrap[1] + 16), fill=green_check, width=6)
 
@@ -943,7 +943,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             draw.text((content_x, row_box[1] + 39), big_bet, font=big_font, fill=white)
         else:
             num_chip = (row_box[0] + 18, row_box[1] + 21, row_box[0] + 60, row_box[1] + 63)
-            _draw_glossy_panel(img, num_chip, 14, (18, 29, 42, 255), (9, 15, 24, 255), outline=(72, 111, 161), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
+            _draw_glossy_panel(img, num_chip, 14, (24, 37, 27, 255), (11, 18, 14, 255), outline=(64, 98, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
             n_txt = str(idx)
             n_w = _text_width(draw, n_txt, _font(20, True))
             _draw_text_vcenter(draw, num_chip, n_txt, _font(20, True), green, x=num_chip[0] + ((num_chip[2] - num_chip[0]) - n_w) / 2)
