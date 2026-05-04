@@ -821,12 +821,14 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     # These replace the old per-element nudge behavior. The lower panel is now
     # built from shared rails + a vertical flow so each module stays locked.
     BADGE_H = 56
-    PLAY_ROW_H = 116
-    MODULE_GAP = 16
+    # Final calibrated lower-panel rhythm. The previous pass was still too airy
+    # and the official-play row read as a loose block. Keep the stack tight.
+    PLAY_ROW_H = 108
+    MODULE_GAP = 14
     CONTENT_ROW_GAP = MODULE_GAP
     BANNER_TOP_GAP = MODULE_GAP
-    BOARD_TOP_GUTTER = 26
-    BOARD_BOTTOM_GUTTER = 24
+    BOARD_TOP_GUTTER = 24
+    BOARD_BOTTOM_GUTTER = 22
 
     green = (132, 255, 55)
     white = (246, 248, 250)
@@ -914,7 +916,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     _draw_drop_shadow(img, hero, radius=24, offset=(0, 10), blur=20, alpha=78)
     _draw_glossy_panel(img, hero, 24, (13, 19, 23, 255), (6, 10, 13, 255), outline=(42, 56, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
 
-    time_pill_w = 236
+    time_pill_w = 230
     time_pill = (hero[0] + LEFT_GUTTER, hero[1] + 22, hero[0] + LEFT_GUTTER + time_pill_w, hero[3] - 22)
     _draw_glossy_panel(img, time_pill, 18, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 10), gloss_alpha=20)
     clock_size = 46
@@ -929,11 +931,11 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     draw.text((time_x, time_group_y), time_text, font=time_font, fill=white)
     draw.text((time_x, time_group_y + _text_height(draw, time_text, time_font) + 5), "EST", font=est_font, fill=green)
 
-    divider_x = time_pill[2] + 15
+    divider_x = time_pill[2] + 16
     draw.line((divider_x, time_pill[1] + 6, divider_x, time_pill[3] - 6), fill=(48, 60, 68), width=2)
 
     matchup = f"{player_1} vs {player_2}"
-    tx = divider_x + 20
+    tx = divider_x + 18
     matchup_text, matchup_font = _fit_text(draw, matchup, hero[2] - tx - RIGHT_GUTTER, 27, True, 18)
     matchup_label_font = _font(14, True)
     matchup_group_h = _text_height(draw, "MATCHUP", matchup_label_font) + 10 + _text_height(draw, matchup_text, matchup_font)
@@ -970,7 +972,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
     if primary_unit:
         unit_text_w = _text_width(draw, primary_unit, _font(30, True))
-        unit_chip_w = max(282, unit_text_w + 110)
+        unit_chip_w = max(292, unit_text_w + 116)
         unit_chip = (content_right - unit_chip_w, top_y, content_right, top_y + chip_h)
         _draw_glossy_panel(img, unit_chip, 16, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 10), gloss_alpha=18)
         _draw_text_vcenter(draw, unit_chip, primary_unit, _font(30, True), green, x=unit_chip[0] + ((unit_chip[2] - unit_chip[0]) - unit_text_w) / 2, y_offset=-2)
@@ -1004,7 +1006,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             # coordinates; text_x derives from the check box.
             check_size = 54
             inner_left_pad = 20
-            icon_text_gap = 24
+            icon_text_gap = 18
             icon_x = row_box[0] + inner_left_pad
             icon_y = int(row_box[1] + ((row_box[3] - row_box[1]) - check_size) / 2)
             check_wrap = (icon_x, icon_y, icon_x + check_size, icon_y + check_size)
@@ -1020,7 +1022,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             big_bet, big_font = _fit_text(draw, bet_text, content_w, 47, True, 38)
             text_gap = 9
             text_group_h = _text_height(draw, sub_label, label_font) + text_gap + _text_height(draw, big_bet, big_font)
-            text_group_y = int(row_box[1] + ((row_box[3] - row_box[1]) - text_group_h) / 2) - 3
+            text_group_y = int(row_box[1] + ((row_box[3] - row_box[1]) - text_group_h) / 2) - 2
             draw.text((content_x, text_group_y), sub_label, font=label_font, fill=off_white)
             pick_y = text_group_y + _text_height(draw, sub_label, label_font) + text_gap - 4
             draw.text((content_x, pick_y), big_bet, font=big_font, fill=white)
