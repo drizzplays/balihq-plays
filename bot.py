@@ -28,6 +28,12 @@ GENERATED_CARD_PATH = BASE_DIR / f"generated_bali_pick_{int(time.time())}.png"
 BRAND_NAME = "BALIHQBETS"
 DEFAULT_SHEET_ID = "YOUR_SHEET_ID_HERE"
 
+# Google Sheet tabs to scan. Keep your original totals card data in the first tab,
+# and create a separate worksheet/tab named MONEYLINES for ML plays.
+TOTALS_WORKSHEET_NAME = os.getenv("TOTALS_WORKSHEET_NAME", "")  # blank = first worksheet
+MONEYLINES_WORKSHEET_NAME = os.getenv("MONEYLINES_WORKSHEET_NAME", "Moneylines")
+LIVE_WORKSHEET_NAME = os.getenv("LIVE_WORKSHEET_NAME", "Live Plays")
+
 EST_TZ = ZoneInfo("America/New_York")
 
 # Posts starting 5 minutes before the listed EST game time.
@@ -284,37 +290,119 @@ def _draw_clock(draw: ImageDraw.ImageDraw, x: int, y: int):
     draw.line((x + 23, y + 24, x + 34, y + 31), fill=green, width=3)
 
 
-def _collect_plays(row: dict) -> list[dict]:
+def _iter_numbered_values(normalized: dict, base_names: tuple[str, ...], max_items: int = 10) -> list[str]:
+    """Return values from duplicated/numbered sheet headers like BET, BET 2, BET 3."""
+    values = []
+
+    for index in range(1, max_items + 1):
+        for base_name in base_names:
+            key = base_name.strip().lower() if index == 1 else f"{base_name.strip().lower()} {index}"
+            value = str(normalized.get(key, "") or "").strip()
+            if value:
+                values.append(value)
+                break
+
+    return values
+
+
+def _get_numbered_value(normalized: dict, index: int, *base_names: str) -> str:
+    for base_name in base_names:
+        key = base_name.strip().lower() if index == 1 else f"{base_name.strip().lower()} {index}"
+        value = str(normalized.get(key, "") or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _detect_market_type(row: dict, plays: list[dict] | None = None) -> str:
+    normalized = _normalize_row(row)
+    explicit_market = " ".join(
+        str(normalized.get(key, "") or "").strip().lower()
+        for key in ("market", "market type", "bet type", "type")
+    )
+
+    play_text = " ".join(str(play.get("bet", "") or "").lower() for play in (plays or []))
+    combined = f"{explicit_market} {play_text}"
+
+    if any(token in combined for token in ("moneyline", "money line", " ml", "ml ")):
+        return "moneyline"
+
+    if any(token in combined for token in ("over", "under", "total", "totals")):
+        return "totals"
+
+    # If a play includes American odds and no total language, treat it as a moneyline.
+    if re.search(r"(^|\s)[+-]\d{3,4}(\s|$)", combined):
+        return "moneyline"
+
+    return "totals"
+
+
+def _format_moneyline_bet(bet: str, row: dict, index: int) -> str:
+    """Clean up moneyline text for the card without forcing a rigid sheet format."""
+    normalized = _normalize_row(row)
+    raw = str(bet or "").strip()
+    selection = _get_numbered_value(normalized, index, "selection", "pick", "player", "winner", "moneyline")
+    odds = _get_numbered_value(normalized, index, "odds", "price", "line")
+
+    # If the sheet has separate Selection + Odds columns, build the clean display from them.
+    if selection and odds and raw.lower() in {selection.lower(), odds.lower()}:
+        return f"{selection} ML {odds}"
+
+    if selection and odds and not raw:
+        return f"{selection} ML {odds}"
+
+    if raw and "moneyline" in raw.lower():
+        raw = re.sub(r"money\s*line", "ML", raw, flags=re.IGNORECASE)
+
+    # Add ML when odds are present but the bet text does not already identify the market.
+    if raw and re.search(r"(^|\s)[+-]\d{3,4}(\s|$)", raw) and not re.search(r"\bML\b", raw, re.IGNORECASE):
+        raw = re.sub(r"\s+", " ", raw).strip()
+        odds_match = re.search(r"[+-]\d{3,4}", raw)
+        if odds_match:
+            odds_text = odds_match.group(0)
+            name = raw.replace(odds_text, "").strip(" -•|@")
+            raw = f"{name} ML {odds_text}" if name else f"ML {odds_text}"
+
+    return raw or "No Moneyline Found"
+
+
+def _collect_plays(row: dict, forced_market_type: str | None = None) -> list[dict]:
     normalized = _normalize_row(row)
 
-    def get_any(*names: str) -> str:
-        for name in names:
-            value = str(normalized.get(name.strip().lower(), "") or "").strip()
-            if value:
-                return value
-        return ""
+    bet_values = _iter_numbered_values(normalized, ("bet", "play", "pick", "selection"))
+    market_type = forced_market_type or _detect_market_type(row, [{"bet": value} for value in bet_values])
 
-    # Only use the primary/first bet from the row.
-    # This intentionally ignores BET 2, BET 3, PLAY 2, etc. so the card posts one official play only.
-    first_bet = get_any("bet", "play")
+    if not bet_values:
+        default_unit = _get_numbered_value(normalized, 1, "unit", "units", "stake")
+        return [{"bet": "No Bet Found", "history": "", "unit": default_unit, "market_type": market_type}]
 
-    if not first_bet:
-        return [{"bet": "No Bet Found", "history": "", "unit": get_any("unit", "units")} ]
+    plays = []
+    for index, bet in enumerate(bet_values, start=1):
+        history = _get_numbered_value(normalized, index, "history", "unit history", "record")
+        unit = _get_numbered_value(normalized, index, "unit", "units", "stake")
+        odds = _get_numbered_value(normalized, index, "odds", "price", "line")
 
-    return [
-        {
-            "bet": first_bet,
-            "history": get_any("history", "unit history"),
-            "unit": get_any("unit", "units"),
-        }
-    ]
+        if market_type == "moneyline":
+            bet = _format_moneyline_bet(bet, row, index)
+
+        plays.append(
+            {
+                "bet": bet,
+                "history": history,
+                "unit": unit,
+                "odds": odds,
+                "market_type": market_type,
+            }
+        )
+
+    return plays
 
 
 def _play_label(play: dict) -> str:
     label = str(play.get("bet", "") or "No Bet Found").strip()
     history = str(play.get("history", "") or "").strip()
 
-    if history:
+    if history and play.get("market_type") != "moneyline":
         label += f"  •  {history} L20"
 
     return label
@@ -328,15 +416,102 @@ def _format_unit(unit: str) -> str:
     return unit
 
 
-def _generate_pick_card(row: dict) -> Path:
+def _draw_market_banner(img: Image.Image, banner_frame: tuple[int, int, int, int], market_type: str):
+    draw = ImageDraw.Draw(img)
+    green = (124, 255, 0)
+    white = (246, 247, 248)
+    dark = (7, 13, 15)
+    muted = (26, 43, 45)
+
+    _rounded_rect(draw, banner_frame, 22, fill=(11, 17, 20), outline=(55, 73, 80), width=1)
+    inner = (banner_frame[0] + 10, banner_frame[1] + 10, banner_frame[2] - 10, banner_frame[3] - 10)
+    _rounded_rect(draw, inner, 18, fill=(238, 242, 239), outline=(35, 55, 58), width=1)
+
+    # Side panels keep the card sports-betting themed without hardcoding the old TOTALS art.
+    left_panel = (inner[0], inner[1], inner[0] + 230, inner[3])
+    right_panel = (inner[2] - 230, inner[1], inner[2], inner[3])
+    draw.rectangle(left_panel, fill=(8, 20, 15))
+    draw.rectangle(right_panel, fill=(8, 20, 15))
+
+    for offset in range(0, 190, 22):
+        draw.line((inner[0] + offset, inner[3], inner[0] + offset + 130, inner[1]), fill=(0, 90, 34), width=4)
+        draw.line((inner[2] - offset, inner[3], inner[2] - offset - 130, inner[1]), fill=(0, 90, 34), width=4)
+
+    # Center title block.
+    center_x1 = inner[0] + 210
+    center_x2 = inner[2] - 210
+    draw.rectangle((center_x1, inner[1], center_x2, inner[3]), fill=(239, 243, 240))
+
+    title = "BALI BETS"
+    if market_type == "moneyline":
+        subtitle = "TABLE TENNIS MONEYLINES"
+        badge = "MONEYLINE CARD"
+    elif market_type == "live":
+        subtitle = "TABLE TENNIS LIVE PLAYS"
+        badge = "LIVE CARD"
+    else:
+        subtitle = "TABLE TENNIS TOTALS"
+        badge = "TOTALS CARD"
+
+    title_text, title_font = _fit_text(draw, title, center_x2 - center_x1 - 40, 82, True, 44)
+    title_w = _text_width(draw, title_text, title_font)
+    draw.text(((center_x1 + center_x2 - title_w) / 2, inner[1] + 68), title_text, font=title_font, fill=(0, 67, 35))
+
+    sub_text, sub_font = _fit_text(draw, subtitle, center_x2 - center_x1 - 40, 42, True, 24)
+    sub_w = _text_width(draw, sub_text, sub_font)
+    sub_y = inner[1] + 164
+    draw.text(((center_x1 + center_x2 - sub_w) / 2, sub_y), sub_text, font=sub_font, fill=dark)
+
+    line_y = sub_y + 58
+    draw.line((center_x1 + 30, line_y, center_x1 + 190, line_y), fill=green, width=5)
+    draw.line((center_x2 - 190, line_y, center_x2 - 30, line_y), fill=green, width=5)
+
+    badge_font = _font(18, True)
+    badge_w = _text_width(draw, badge, badge_font)
+    draw.text(((center_x1 + center_x2 - badge_w) / 2, inner[3] - 46), badge, font=badge_font, fill=(38, 51, 53))
+
+    # Simple paddle/ball shapes, drawn in code so the file does not need another asset.
+    for side in ("left", "right"):
+        if side == "left":
+            cx, cy = inner[0] + 108, inner[1] + 155
+            handle = (cx + 34, cy + 58, cx + 72, cy + 126)
+            ball = (inner[0] + 86, inner[3] - 74, inner[0] + 130, inner[3] - 30)
+            if market_type == "moneyline":
+                paddle_fill = (0, 76, 38)
+            elif market_type == "live":
+                paddle_fill = (124, 255, 0)
+            else:
+                paddle_fill = (202, 18, 25)
+        else:
+            cx, cy = inner[2] - 108, inner[1] + 155
+            handle = (cx - 72, cy + 58, cx - 34, cy + 126)
+            ball = (inner[2] - 130, inner[3] - 74, inner[2] - 86, inner[3] - 30)
+            paddle_fill = (22, 24, 25)
+
+        draw.ellipse((cx - 72, cy - 72, cx + 72, cy + 72), fill=paddle_fill, outline=(18, 18, 18), width=3)
+        draw.rounded_rectangle(handle, radius=10, fill=(111, 62, 28), outline=(36, 24, 18), width=2)
+        draw.ellipse(ball, fill=(235, 239, 236), outline=(175, 185, 180), width=2)
+
+    # Subtle bottom glow.
+    glow = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    gd.rectangle((inner[0], inner[3] - 52, inner[2], inner[3]), fill=(0, 120, 43, 42))
+    glow = glow.filter(ImageFilter.GaussianBlur(18))
+    img.alpha_composite(glow)
+
+
+def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Path:
     league = _get_value(row, "LEAGUE", fallback="TT Elite")
     est = _get_value(row, "EST")
     player_1 = _get_value(row, "Player 1", "Player1", fallback="TBD")
     player_2 = _get_value(row, "Player 2", "Player2", fallback="TBD")
 
-    plays = _collect_plays(row)
+    plays = _collect_plays(row, forced_market_type=forced_market_type)
+    market_type = forced_market_type or _detect_market_type(row, plays)
+    for play in plays:
+        play["market_type"] = market_type
     play_count = len(plays)
-    primary_unit = _format_unit(plays[0].get("unit", "") or _get_value(row, "Unit", "Units", fallback=""))
+    primary_unit = _format_unit(plays[0].get("unit", "") or _get_value(row, "Unit", "Units", "Stake", fallback=""))
 
     width = 1200
     outer_pad = 24
@@ -399,8 +574,10 @@ def _generate_pick_card(row: dict) -> Path:
 
     _paste_circle(img, AVATAR_PATH, (header[0] + 16, header_y + 17, header[0] + 70, header_y + 71), border=0)
     draw.text((header[0] + 84, header_y + 11), BRAND_NAME, font=_font(32, True), fill=white)
-    draw.text((header[0] + 86, header_y + 50), "BET ALERT", font=_font(17, True), fill=green)
-    draw.text((header[0] + 192, header_y + 50), "AUTO POSTED PLAY", font=_font(17, True), fill=muted)
+    alert_label = "LIVE BET ALERT" if market_type == "live" else "BET ALERT"
+    alert_x = header[0] + 86
+    draw.text((alert_x, header_y + 50), alert_label, font=_font(17, True), fill=green)
+    draw.text((alert_x + _text_width(draw, alert_label + " ", _font(17, True)), header_y + 50), "AUTO POSTED PLAY", font=_font(17, True), fill=muted)
 
     logo_badge = (right - 170, header_y + 10, right - 18, header_y + 82)
     _rounded_rect(draw, logo_badge, 20, fill=(12, 20, 23), outline=(44, 60, 67), width=1)
@@ -462,7 +639,13 @@ def _generate_pick_card(row: dict) -> Path:
         draw.text((unit_chip[0] + ((unit_chip[2] - unit_chip[0]) - unit_w) / 2, chip_y + 10), unit_label, font=_font(18, True), fill=green)
 
     draw.line((board[0] + 22, board_y + 78, board[2] - 22, board_y + 78), fill=soft_stroke, width=1)
-    draw.text((board[0] + 22, board_y + 98), "OFFICIAL PLAYS", font=_font(16, True), fill=muted)
+    if market_type == "moneyline":
+        official_title = "OFFICIAL MONEYLINES"
+    elif market_type == "live":
+        official_title = "OFFICIAL LIVE PLAYS"
+    else:
+        official_title = "OFFICIAL PLAYS"
+    draw.text((board[0] + 22, board_y + 98), official_title, font=_font(16, True), fill=muted)
 
     # play rows
     row_x1 = board[0] + 22
@@ -490,13 +673,19 @@ def _generate_pick_card(row: dict) -> Path:
             record_label = f"{history_text} L20"
             record_font = _font(22, True)
             bullet_font = _font(22, True)
-            record_w = _text_width(draw, record_label, record_font)
-            bullet_w = _text_width(draw, "  •  ", bullet_font)
-            bet_fit, bet_font = _fit_text(draw, bet_text, max_main_w - record_w - bullet_w, 23, True, 15)
-            draw.text((main_x, current_y + 16), bet_fit, font=bet_font, fill=white)
-            bet_w = _text_width(draw, bet_fit, bet_font)
-            draw.text((main_x + bet_w, current_y + 16), "  •  ", font=bullet_font, fill=off_white)
-            draw.text((main_x + bet_w + bullet_w, current_y + 16), record_label, font=record_font, fill=white)
+
+            # Moneylines should read cleanly as the pick/price, not as a totals-history formula.
+            if market_type == "moneyline":
+                bet_fit, bet_font = _fit_text(draw, bet_text, max_main_w, 23, True, 15)
+                draw.text((main_x, current_y + 16), bet_fit, font=bet_font, fill=white)
+            else:
+                record_w = _text_width(draw, record_label, record_font)
+                bullet_w = _text_width(draw, "  •  ", bullet_font)
+                bet_fit, bet_font = _fit_text(draw, bet_text, max_main_w - record_w - bullet_w, 23, True, 15)
+                draw.text((main_x, current_y + 16), bet_fit, font=bet_font, fill=white)
+                bet_w = _text_width(draw, bet_fit, bet_font)
+                draw.text((main_x + bet_w, current_y + 16), "  •  ", font=bullet_font, fill=off_white)
+                draw.text((main_x + bet_w + bullet_w, current_y + 16), record_label, font=record_font, fill=white)
         else:
             bet_fit, bet_font = _fit_text(draw, bet_text, max_main_w, 23, True, 15)
             draw.text((main_x, current_y + 16), bet_fit, font=bet_font, fill=white)
@@ -505,7 +694,7 @@ def _generate_pick_card(row: dict) -> Path:
         if play.get("unit"):
             meta_parts.append(_format_unit(play.get("unit", "")))
         if history_text:
-            meta_parts.append(f"History {history_text}")
+            meta_parts.append(("Record " if market_type == "moneyline" else "History ") + history_text)
         if meta_parts:
             draw.text((main_x, current_y + 50), "   •   ".join(meta_parts), font=_font(15, False), fill=off_white)
 
@@ -514,18 +703,21 @@ def _generate_pick_card(row: dict) -> Path:
 
     # banner
     banner_frame = (board[0] + 22, banner_y, board[2] - 22, banner_y + banner_h)
-    _rounded_rect(draw, banner_frame, 22, fill=(11, 17, 20), outline=(55, 73, 80), width=1)
-    _paste_cover(img, BANNER_PATH, (banner_frame[0] + 10, banner_frame[1] + 10, banner_frame[2] - 10, banner_frame[3] - 10), radius=18)
+    if market_type in ("moneyline", "live"):
+        _draw_market_banner(img, banner_frame, market_type)
+    else:
+        _rounded_rect(draw, banner_frame, 22, fill=(11, 17, 20), outline=(55, 73, 80), width=1)
+        _paste_cover(img, BANNER_PATH, (banner_frame[0] + 10, banner_frame[1] + 10, banner_frame[2] - 10, banner_frame[3] - 10), radius=18)
 
-    gloss = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    gd = ImageDraw.Draw(gloss)
-    gd.polygon([
-        (banner_frame[0] + 10, banner_frame[1] + 10),
-        (banner_frame[0] + 310, banner_frame[1] + 10),
-        (banner_frame[0] + 220, banner_frame[1] + 96),
-        (banner_frame[0] + 10, banner_frame[1] + 96),
-    ], fill=(255, 255, 255, 18))
-    img.alpha_composite(gloss)
+        gloss = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        gd = ImageDraw.Draw(gloss)
+        gd.polygon([
+            (banner_frame[0] + 10, banner_frame[1] + 10),
+            (banner_frame[0] + 310, banner_frame[1] + 10),
+            (banner_frame[0] + 220, banner_frame[1] + 96),
+            (banner_frame[0] + 10, banner_frame[1] + 96),
+        ], fill=(255, 255, 255, 18))
+        img.alpha_composite(gloss)
 
     img = img.convert("RGB")
     img.save(GENERATED_CARD_PATH, quality=95)
@@ -588,6 +780,88 @@ def _mark_posted(sheet, row_number: int, posted_col: int):
     sheet.update_cell(row_number, posted_col, now)
 
 
+
+def _worksheet_jobs(client, sheet_id: str):
+    """Return worksheet + forced market type jobs.
+
+    Totals keeps using the first tab by default.
+    Moneylines uses its own Google Sheet tab named by MONEYLINES_WORKSHEET_NAME.
+    Live plays uses its own Google Sheet tab named by LIVE_WORKSHEET_NAME.
+    """
+    spreadsheet = client.open_by_key(sheet_id)
+    jobs = []
+
+    try:
+        totals_sheet = spreadsheet.worksheet(TOTALS_WORKSHEET_NAME) if TOTALS_WORKSHEET_NAME else spreadsheet.sheet1
+        jobs.append((totals_sheet, "totals"))
+    except Exception as exc:
+        print(f"⚠️ Totals tab not found: {TOTALS_WORKSHEET_NAME or 'first worksheet'} | {exc}")
+
+    try:
+        moneylines_sheet = spreadsheet.worksheet(MONEYLINES_WORKSHEET_NAME)
+        jobs.append((moneylines_sheet, "moneyline"))
+    except Exception as exc:
+        print(f"⚠️ Moneylines tab not found: {MONEYLINES_WORKSHEET_NAME}. Create a Google Sheet tab named '{MONEYLINES_WORKSHEET_NAME}'. | {exc}")
+
+    try:
+        live_sheet = spreadsheet.worksheet(LIVE_WORKSHEET_NAME)
+        jobs.append((live_sheet, "live"))
+    except Exception as exc:
+        print(f"⚠️ Live Plays tab not found: {LIVE_WORKSHEET_NAME}. Create a Google Sheet tab named '{LIVE_WORKSHEET_NAME}'. | {exc}")
+
+    return jobs
+
+
+def _run_sheet_tab(sheet, forced_market_type: str) -> int:
+    tab_name = getattr(sheet, "title", forced_market_type)
+    rows, row_numbers, header_map = _rows_from_sheet(sheet)
+
+    if not rows:
+        print(f"⚠️ {tab_name}: Sheet tab is empty.")
+        return 0
+
+    posted_col = _ensure_posted_column(sheet, header_map)
+    eligible_rows = []
+
+    for row, row_number in zip(rows, row_numbers):
+        posted_value = _get_value(row, "POSTED", fallback="").strip()
+
+        if posted_value:
+            print(f"{tab_name} row {row_number}: Already posted. Skipping.")
+            continue
+
+        should_post, reason = _is_post_time(row)
+        print(f"{tab_name} row {row_number}: {reason}")
+
+        if should_post:
+            play_time = _parse_est_datetime(row)
+            eligible_rows.append((play_time, row_number, row))
+
+    if not eligible_rows:
+        print(f"ℹ️ {tab_name}: No eligible plays to post right now.")
+        return 0
+
+    eligible_rows.sort(key=lambda item: item[0])
+    posted_count = 0
+
+    webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
+
+    for play_time, row_number, row in eligible_rows[:MAX_POSTS_PER_RUN]:
+        print(f"✅ {tab_name}: Posting {forced_market_type} play for row {row_number}: {row.get('Player 1')} vs {row.get('Player 2')}")
+
+        card_path = _generate_pick_card(row, forced_market_type=forced_market_type)
+        response = _post_card_to_discord(webhook_url, card_path)
+
+        if response.status_code in (200, 204):
+            _mark_posted(sheet, row_number, posted_col)
+            posted_count += 1
+            print(f"🚀 {tab_name}: Success! Row {row_number} posted and marked POSTED.")
+        else:
+            print(f"❌ {tab_name}: Failed row {row_number}. Status: {response.status_code}, Response: {response.text}")
+
+    return posted_count
+
+
 def run_automation():
     creds_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
     webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
@@ -611,51 +885,17 @@ def run_automation():
     client = gspread.authorize(creds)
 
     try:
-        sheet = client.open_by_key(sheet_id).sheet1
-        rows, row_numbers, header_map = _rows_from_sheet(sheet)
+        jobs = _worksheet_jobs(client, sheet_id)
 
-        if not rows:
-            print("⚠️ Sheet is empty.")
+        if not jobs:
+            print("❌ No usable worksheet tabs found. Add your totals tab, Moneylines tab, and Live Plays tab.")
             return
 
-        posted_col = _ensure_posted_column(sheet, header_map)
-        eligible_rows = []
+        total_posted = 0
+        for sheet, forced_market_type in jobs:
+            total_posted += _run_sheet_tab(sheet, forced_market_type)
 
-        for row, row_number in zip(rows, row_numbers):
-            posted_value = _get_value(row, "POSTED", fallback="").strip()
-
-            if posted_value:
-                print(f"Row {row_number}: Already posted. Skipping.")
-                continue
-
-            should_post, reason = _is_post_time(row)
-            print(f"Row {row_number}: {reason}")
-
-            if should_post:
-                play_time = _parse_est_datetime(row)
-                eligible_rows.append((play_time, row_number, row))
-
-        if not eligible_rows:
-            print("ℹ️ No eligible plays to post right now.")
-            return
-
-        eligible_rows.sort(key=lambda item: item[0])
-        posted_count = 0
-
-        for play_time, row_number, row in eligible_rows[:MAX_POSTS_PER_RUN]:
-            print(f"✅ Posting play for row {row_number}: {row.get('Player 1')} vs {row.get('Player 2')}")
-
-            card_path = _generate_pick_card(row)
-            response = _post_card_to_discord(webhook_url, card_path)
-
-            if response.status_code in (200, 204):
-                _mark_posted(sheet, row_number, posted_col)
-                posted_count += 1
-                print(f"🚀 Success! Row {row_number} posted and marked POSTED.")
-            else:
-                print(f"❌ Failed row {row_number}. Status: {response.status_code}, Response: {response.text}")
-
-        print(f"✅ Finished. Posted {posted_count} play(s).")
+        print(f"✅ Finished. Posted {total_posted} play(s) across all tabs.")
 
     except Exception as e:
         print(f"❌ Python Error: {e}")
