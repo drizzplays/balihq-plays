@@ -914,7 +914,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
     title_x = header_logo_box[2] + 20
     title_y = header[1] + 12
-    alert_y = header[1] + 49
+    alert_y = header[1] + 47
     draw.text((title_x, title_y), BRAND_NAME, font=_font(28, True), fill=white)
     alert_font = _font(16, True)
     alert_chip_text = "BET ALERT"
@@ -922,7 +922,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     alert_chip = (title_x, alert_y, title_x + alert_chip_w, alert_y + 26)
     _draw_glossy_panel(img, alert_chip, 12, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
     _draw_text_vcenter(draw, alert_chip, alert_chip_text, alert_font, green, x=alert_chip[0] + 12)
-    draw.text((alert_chip[2] + 16, alert_y + 2), "PLAY STARTING IN 5 MINUTES", font=alert_font, fill=muted)
+    draw.text((alert_chip[2] + 16, alert_y + 1), "PLAY STARTING IN 5 MINUTES", font=alert_font, fill=muted)
 
     badge_w = 132
     badge = (header[2] - INNER_PAD - badge_w, header[1] + 10, header[2] - INNER_PAD, header[3] - 10)
@@ -990,7 +990,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
     odds_chip = None
     pill_gap = 14
-    if primary_odds:
+    if primary_odds and not single_moneyline_layout:
         odds_font = _font(28, True)
         odds_text_w = _text_width(draw, primary_odds, odds_font)
         odds_chip_w = max(208, odds_text_w + 84)
@@ -1031,9 +1031,8 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         history_text = str(play.get("history", "") or "").strip()
 
         if single_moneyline_layout:
-            # Fixed icon column + fixed text column. The icon, label, and pick
-            # are one grouped composition. Do not place these from unrelated
-            # coordinates; text_x derives from the check box.
+            # Moneyline single-play layout: player name + MONEYLINE pill on the left,
+            # and a larger odds pill centered on the right side of the play row.
             check_size = 54
             inner_left_pad = 20
             icon_text_gap = 18
@@ -1046,17 +1045,32 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             draw.line((check_wrap[0] + 23, check_wrap[1] + 38, check_wrap[0] + 38, check_wrap[1] + 18), fill=green_check, width=6)
 
             content_x = icon_x + check_size + icon_text_gap
-            content_w = row_box[2] - content_x - RIGHT_GUTTER
             sub_label = "OFFICIAL PLAY"
             label_font = _font(15, True)
             title_text = _moneyline_name_display(bet_text)
-            pill_font = _font(17, True)
-            pill_text = "BET"
+            pill_font = _font(16, True)
+            pill_text = "MONEYLINE"
             pill_text_w = _text_width(draw, pill_text, pill_font)
-            pill_pad_x = 14
-            pill_h = 28
+            pill_pad_x = 16
+            pill_h = 30
             pill_w = pill_text_w + pill_pad_x * 2
             title_gap = 16
+
+            row_right_pad = 20
+            odds_text = _odds_display(play.get("odds", "") or primary_odds)
+            odds_chip = None
+            odds_chip_gap = 20
+            reserved_right = row_box[2] - row_right_pad
+            if odds_text:
+                odds_font = _font(30, True)
+                odds_text_w = _text_width(draw, odds_text, odds_font)
+                odds_chip_w = max(220, odds_text_w + 96)
+                odds_chip_h = 48
+                odds_y = int(row_box[1] + ((row_box[3] - row_box[1]) - odds_chip_h) / 2)
+                odds_chip = (reserved_right - odds_chip_w, odds_y, reserved_right, odds_y + odds_chip_h)
+                reserved_right = odds_chip[0] - odds_chip_gap
+
+            content_w = max(120, reserved_right - content_x)
             max_title_w = max(80, content_w - pill_w - title_gap)
             big_bet, big_font = _fit_text(draw, title_text, max_title_w, 47, True, 32)
             title_h = _text_height(draw, big_bet, big_font)
@@ -1068,9 +1082,15 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             draw.text((content_x, pick_y), big_bet, font=big_font, fill=white)
             title_w = _text_width(draw, big_bet, big_font)
             pill_y = int(pick_y + max(0, (title_h - pill_h) / 2) + 1)
-            bet_chip = (content_x + title_w + title_gap, pill_y, content_x + title_w + title_gap + pill_w, pill_y + pill_h)
-            _draw_glossy_panel(img, bet_chip, 12, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
-            _draw_text_vcenter(draw, bet_chip, pill_text, pill_font, green, x=bet_chip[0] + pill_pad_x, y_offset=-1)
+            market_chip = (content_x + title_w + title_gap, pill_y, content_x + title_w + title_gap + pill_w, pill_y + pill_h)
+            _draw_glossy_panel(img, market_chip, 12, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
+            _draw_text_vcenter(draw, market_chip, pill_text, pill_font, green, x=market_chip[0] + pill_pad_x, y_offset=-1)
+
+            if odds_chip:
+                _draw_glossy_panel(img, odds_chip, 16, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 10), gloss_alpha=18)
+                odds_font = _font(30, True)
+                odds_text_w = _text_width(draw, odds_text, odds_font)
+                _draw_text_vcenter(draw, odds_chip, odds_text, odds_font, white, x=odds_chip[0] + ((odds_chip[2] - odds_chip[0]) - odds_text_w) / 2, y_offset=-1)
         else:
             num_chip = (row_box[0] + 18, row_box[1] + 21, row_box[0] + 60, row_box[1] + 63)
             _draw_glossy_panel(img, num_chip, 14, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
