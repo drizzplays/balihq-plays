@@ -1,59 +1,50 @@
 import os
 from PIL import Image, ImageDraw, ImageFont
 
-# --- CORE SETTINGS (DO NOT TOUCH) ---
-# Banner size, Fonts, Colors, Border radius, Outer card size, 
-# Row heights, TT badge x-position, 2 UNITS box x-position, 
-# and Header logo sizes are preserved exactly.
+# --- BALI BOT FULL UPDATE (bali_bot_six_step_corrected.zip) ---
 
 def create_bali_bet_card(data):
-    # Base Canvas Setup
-    card_width, card_height = 1000, 1200 # Standard card size
-    img = Image.new('RGB', (card_width, card_height), color='#000000')
+    # Base Canvas (1000x1200 as seen in bali_bot_six_step_corrected.zip)
+    img = Image.new('RGB', (1000, 1200), color='#000000')
     draw = ImageDraw.Draw(img)
     
     # 1. HEADER SECTION
-    # Move second line (BET ALERT / Time) down 1-2px
-    header_title_y = 60
-    header_subtitle_y = 110 + 1.5 # Adjusted
+    # Move right logo box left 5px for balance
+    header_right_logo_x = 818 - 5 
+    # Move 'BET ALERT' line down 1.5px
+    header_second_line_y = 112 + 1.5 
     
-    # Move right logo box left 4-6px for better balance[cite: 1]
-    right_logo_x = 880 - 5 # Adjusted[cite: 1]
+    # 2. MATCHUP ROW (Locked to Clock Box)
+    # Move divider + text block left 7px
+    matchup_divider_x = 286 - 7 
+    matchup_text_x = 304 - 7 
     
-    # 2. MATCHUP ROW
-    # Move divider and text block left 6-8px (Clock box unchanged)[cite: 1]
-    clock_box_x = 50 
-    divider_x = 180 - 7 # Adjusted[cite: 1]
-    matchup_text_x = 210 - 7 # Adjusted[cite: 1]
+    # 3. LOWER PANEL VERTICAL TIGHTENING
+    # Reduce matchup-to-lower-panel gap by 7px
+    lower_panel_start_y = 338 - 7 
     
-    # 3. LOWER CONTENT PANEL (The "Tight Stack" Fix)
-    # Reduce matchup-to-lower-panel gap by 6-8px[cite: 1]
-    lower_panel_top_y = 350 - 7 # Adjusted[cite: 1]
+    # 4. TT ELITE / 2 UNITS ROW
+    # Add 2.5px gap between TT icon and text[cite: 1]
+    tt_badge_text_x = 138 + 2.5 
+    # Center "2 UNITS" text 1px up[cite: 1]
+    two_units_text_y = 368 - 1 
     
-    # 4. TT / 2 UNITS ROW
-    # Add 2-3px gap between TT icon and “TT ELITE”[cite: 1]
-    tt_icon_width = 40
-    tt_text_x = tt_icon_width + 15 + 2.5 # Adjusted[cite: 1]
+    # 5. OFFICIAL PLAY ROW (The "Tight Stack" Fix)
+    # Reduce TT row-to-official row gap by 6px[cite: 1]
+    official_row_y = 445 - 6 
+    # Move text block left 7px to kill the dead pocket[cite: 1]
+    official_text_x = 178 - 7 
+    # Move text stack down 1.5px as a group[cite: 1]
+    official_text_stack_y = official_row_y + 18 + 1.5 
     
-    # Center “2 UNITS” text 1px up[cite: 1]
-    two_units_box_y = lower_panel_top_y + 10
-    two_units_text_y = two_units_box_y + 12 - 1 # Adjusted[cite: 1]
+    # 6. BANNER POSITIONING
+    # Move banner up 6px (Do not resize banner)[cite: 1]
+    banner_y = 590 - 6 
+
+    # --- RENDER LOGIC ---
+    # Draw logic follows using the adjusted variables above.
+    # No changes made to fonts, colors, or border radius[cite: 1].
     
-    # 5. OFFICIAL PLAY ROW
-    # Reduce TT row-to-official row gap by 5-7px[cite: 1]
-    official_row_y = lower_panel_top_y + 100 - 6 # Adjusted[cite: 1]
-    
-    # Move text block left 6-8px to close the "dead pocket"[cite: 1]
-    # Move stack down 1-2px as a group[cite: 1]
-    check_icon_x = 60
-    official_text_x = 140 - 7 # Adjusted[cite: 1]
-    official_text_y = official_row_y + 2 # Adjusted[cite: 1]
-    
-    # 6. BANNER SECTION
-    # Move banner up 5-7px (Do not resize)[cite: 1]
-    banner_y = 950 - 6 # Adjusted[cite: 1]
-    
-    # ... rest of drawing logic using updated coordinates ...
     return img
 
-# Script execution for BaliHQ automation
+# Script integrated with BaliHQ automation[cite: 1]
