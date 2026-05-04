@@ -315,15 +315,19 @@ def _draw_league_chip(img: Image.Image, draw: ImageDraw.ImageDraw, box, league: 
     chip_fill = (14, 22, 26)
     chip_outline = (54, 73, 80)
     _rounded_rect(draw, box, 16, fill=chip_fill, outline=chip_outline, width=1)
+    _add_panel_gloss(img, box, radius=16, top_alpha=20, bottom_alpha=14)
 
     icon_path = _league_icon_path(league)
     text_x = box[0] + 16
     text_max_width = (box[2] - box[0]) - 32
 
     if icon_path:
-        icon_box = (box[0] + 10, box[1] + 6, box[0] + 42, box[1] + 38)
+        icon_wrap = (box[0] + 9, box[1] + 6, box[0] + 45, box[1] + 36)
+        _rounded_rect(draw, icon_wrap, 10, fill=(18, 27, 31), outline=(63, 82, 90), width=1)
+        _add_panel_gloss(img, icon_wrap, radius=10, top_alpha=24, bottom_alpha=12)
+        icon_box = (icon_wrap[0] + 4, icon_wrap[1] + 3, icon_wrap[2] - 4, icon_wrap[3] - 3)
         _paste_contain(img, icon_path, icon_box)
-        text_x = icon_box[2] + 10
+        text_x = icon_wrap[2] + 10
         text_max_width = box[2] - text_x - 14
 
     league_text, league_font = _fit_text(draw, str(league).upper(), text_max_width, 23, True, 15)
@@ -339,6 +343,55 @@ def _draw_soft_glow(base: Image.Image, box, radius: int, color=(124, 255, 0, 100
     gd.rounded_rectangle(box, radius=radius, outline=color, width=border)
     glow = glow.filter(ImageFilter.GaussianBlur(10))
     base.alpha_composite(glow)
+
+
+def _add_panel_gloss(base: Image.Image, box, radius: int = 18, top_alpha: int = 36, bottom_alpha: int = 22):
+    """Add a subtle top highlight and bottom shadow for more depth."""
+    x1, y1, x2, y2 = box
+    w = max(1, x2 - x1)
+    h = max(1, y2 - y1)
+
+    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    od = ImageDraw.Draw(overlay)
+    od.rounded_rectangle((0, 0, w - 1, h - 1), radius=radius, fill=(0, 0, 0, 0))
+
+    top_h = max(10, int(h * 0.45))
+    for i in range(top_h):
+        a = int(top_alpha * (1 - i / max(1, top_h)))
+        od.line((2, i + 2, w - 3, i + 2), fill=(255, 255, 255, a), width=1)
+
+    bottom_h = max(12, int(h * 0.28))
+    for i in range(bottom_h):
+        a = int(bottom_alpha * ((i + 1) / max(1, bottom_h)))
+        y = h - bottom_h + i - 1
+        od.line((2, y, w - 3, y), fill=(0, 0, 0, a), width=1)
+
+    if radius > 0:
+        mask = Image.new("L", (w, h), 0)
+        md = ImageDraw.Draw(mask)
+        md.rounded_rectangle((0, 0, w - 1, h - 1), radius=radius, fill=255)
+        clipped = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        clipped.paste(overlay, (0, 0), mask)
+        overlay = clipped
+
+    base.alpha_composite(overlay, (x1, y1))
+
+
+def _unit_display(unit: str) -> str:
+    value = str(unit or "").strip().upper().replace("UNITS", "").replace("UNIT", "").replace("U", "").strip()
+    if not value:
+        return ""
+
+    try:
+        numeric = float(value)
+        if numeric.is_integer():
+            value = str(int(numeric))
+        else:
+            value = (f"{numeric:.2f}").rstrip("0").rstrip(".")
+    except ValueError:
+        value = value.strip()
+
+    return f"{value} UNIT" if value == "1" else f"{value} UNITS"
 
 
 def _draw_check(draw: ImageDraw.ImageDraw, x: int, y: int):
@@ -532,7 +585,9 @@ def _draw_market_banner(img: Image.Image, banner_frame: tuple[int, int, int, int
     muted = (26, 43, 45)
 
     _rounded_rect(draw, banner_frame, 22, fill=(11, 17, 20), outline=(55, 73, 80), width=1)
+    _add_panel_gloss(img, banner_frame, radius=22, top_alpha=18, bottom_alpha=16)
     inner = (banner_frame[0] + 10, banner_frame[1] + 10, banner_frame[2] - 10, banner_frame[3] - 10)
+    _draw_soft_glow(img, inner, radius=18, color=(0, 150, 60, 35), border=3)
     _rounded_rect(draw, inner, 18, fill=(238, 242, 239), outline=(35, 55, 58), width=1)
 
     # Side panels keep the card sports-betting themed without hardcoding the old TOTALS art.
@@ -548,6 +603,11 @@ def _draw_market_banner(img: Image.Image, banner_frame: tuple[int, int, int, int
     # Center title block.
     center_x1 = inner[0] + 210
     center_x2 = inner[2] - 210
+    shadow = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shadow)
+    sd.rounded_rectangle((center_x1 + 5, inner[1] + 8, center_x2 + 5, inner[3] + 8), radius=0, fill=(0, 0, 0, 36))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(10))
+    img.alpha_composite(shadow)
     draw.rectangle((center_x1, inner[1], center_x2, inner[3]), fill=(239, 243, 240))
 
     title = "BALI BETS"
@@ -621,7 +681,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     for play in plays:
         play["market_type"] = market_type
     play_count = len(plays)
-    primary_unit = _format_unit(plays[0].get("unit", "") or _get_value(row, "Unit", "Units", "Stake", fallback=""))
+    primary_unit = _unit_display(plays[0].get("unit", "") or _get_value(row, "Unit", "Units", "Stake", fallback=""))
 
     width = 1200
     outer_pad = 24
@@ -681,6 +741,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     # header
     header = (left, header_y, right, header_y + header_h)
     _rounded_rect(draw, header, 24, fill=(11, 18, 21), outline=(42, 58, 65), width=1)
+    _add_panel_gloss(img, header, radius=24, top_alpha=28, bottom_alpha=18)
 
     _paste_circle(img, AVATAR_PATH, (header[0] + 16, header_y + 17, header[0] + 70, header_y + 71), border=0)
     draw.text((header[0] + 84, header_y + 11), BRAND_NAME, font=_font(32, True), fill=white)
@@ -691,15 +752,18 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
     logo_badge = (right - 170, header_y + 10, right - 18, header_y + 82)
     _rounded_rect(draw, logo_badge, 20, fill=(12, 20, 23), outline=(44, 60, 67), width=1)
+    _add_panel_gloss(img, logo_badge, radius=20, top_alpha=20, bottom_alpha=12)
     _paste_contain(img, AVATAR_PATH, (logo_badge[0] + 28, logo_badge[1] + 9, logo_badge[2] - 28, logo_badge[3] - 9))
 
     # matchup bar
     matchup_box = (left + 18, matchup_y, right - 18, matchup_y + matchup_h)
     _draw_soft_glow(img, matchup_box, radius=24, color=(124, 255, 0, 58), border=4)
     _rounded_rect(draw, matchup_box, 24, fill=(8, 14, 16), outline=green, width=2)
+    _add_panel_gloss(img, matchup_box, radius=24, top_alpha=16, bottom_alpha=20)
 
     time_chip = (matchup_box[0] + 18, matchup_y + 14, matchup_box[0] + 226, matchup_y + 80)
     _rounded_rect(draw, time_chip, 18, fill=(13, 23, 18), outline=(72, 118, 74), width=1)
+    _add_panel_gloss(img, time_chip, radius=18, top_alpha=20, bottom_alpha=12)
     _draw_clock(draw, time_chip[0] + 14, time_chip[1] + 10)
     clean_est = str(est).upper().replace("EST", "").replace("EDT", "").strip() or est
     time_text, time_font = _fit_text(draw, clean_est, 130, 23, True, 16)
@@ -729,20 +793,26 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     board = (left + 18, board_y, right - 18, board_bottom)
     _draw_soft_glow(img, board, radius=28, color=(124, 255, 0, 56), border=5)
     _rounded_rect(draw, board, 28, fill=panel_fill, outline=(54, 72, 79), width=1)
+    _add_panel_gloss(img, board, radius=28, top_alpha=22, bottom_alpha=18)
 
     chip_y = board_y + 22
     league_chip = (board[0] + 22, chip_y, board[0] + 292, chip_y + chip_h)
     _draw_league_chip(img, draw, league_chip, league, text_color=white)
 
-    count_chip = (league_chip[2] + 18, chip_y, league_chip[2] + 176, chip_y + chip_h)
-    _rounded_rect(draw, count_chip, 16, fill=(13, 24, 17), outline=(74, 121, 78), width=1)
-    play_word = "PLAY" if play_count == 1 else "PLAYS"
-    draw.text((count_chip[0] + 16, chip_y + 10), f"{play_count} {play_word}", font=_font(18, True), fill=green)
+    next_chip_x = league_chip[2] + 18
+    if play_count > 1:
+        count_chip = (next_chip_x, chip_y, next_chip_x + 176, chip_y + chip_h)
+        _rounded_rect(draw, count_chip, 16, fill=(13, 24, 17), outline=(74, 121, 78), width=1)
+        _add_panel_gloss(img, count_chip, radius=16, top_alpha=18, bottom_alpha=10)
+        play_word = "PLAY" if play_count == 1 else "PLAYS"
+        draw.text((count_chip[0] + 16, chip_y + 10), f"{play_count} {play_word}", font=_font(18, True), fill=green)
+        next_chip_x = count_chip[2] + 18
 
     if primary_unit:
-        unit_chip = (board[2] - 156, chip_y, board[2] - 22, chip_y + chip_h)
+        unit_chip = (board[2] - 170, chip_y, board[2] - 22, chip_y + chip_h)
         _rounded_rect(draw, unit_chip, 16, fill=(13, 24, 17), outline=(74, 121, 78), width=1)
-        unit_label = f"STAKE {primary_unit}"
+        _add_panel_gloss(img, unit_chip, radius=16, top_alpha=18, bottom_alpha=10)
+        unit_label = primary_unit
         unit_w = _text_width(draw, unit_label, _font(18, True))
         draw.text((unit_chip[0] + ((unit_chip[2] - unit_chip[0]) - unit_w) / 2, chip_y + 10), unit_label, font=_font(18, True), fill=green)
 
@@ -753,7 +823,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         official_title = "OFFICIAL LIVE PLAYS"
     else:
         official_title = "OFFICIAL PLAYS"
-    draw.text((board[0] + 22, board_y + 98), official_title, font=_font(16, True), fill=muted)
+    draw.text((board[0] + 22, board_y + 98), official_title, font=_font(16, True), fill=(132, 144, 154))
 
     # play rows
     row_x1 = board[0] + 22
@@ -763,6 +833,8 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     for idx, play in enumerate(plays, start=1):
         row_box = (row_x1, current_y, row_x2, current_y + row_h)
         _rounded_rect(draw, row_box, 18, fill=row_fill, outline=stroke, width=1)
+        _add_panel_gloss(img, row_box, radius=18, top_alpha=18, bottom_alpha=12)
+        draw.rounded_rectangle((row_box[0] + 8, row_box[1] + 10, row_box[0] + 13, row_box[3] - 10), radius=3, fill=(110, 240, 0))
 
         num_chip = (row_x1 + 16, current_y + 20, row_x1 + 58, current_y + 62)
         _rounded_rect(draw, num_chip, 14, fill=(12, 21, 17), outline=(68, 112, 70), width=1)
@@ -803,7 +875,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         if scenario_text:
             meta_parts.append(f"If {scenario_text}" if not scenario_text.lower().startswith("if ") else scenario_text)
         if play.get("unit"):
-            meta_parts.append(_format_unit(play.get("unit", "")))
+            meta_parts.append(_unit_display(play.get("unit", "")))
         if history_text and market_type == "totals":
             meta_parts.append("History " + history_text)
         if meta_parts:
@@ -820,6 +892,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         _draw_market_banner(img, banner_frame, market_type)
     else:
         _rounded_rect(draw, banner_frame, 22, fill=(11, 17, 20), outline=(55, 73, 80), width=1)
+        _add_panel_gloss(img, banner_frame, radius=22, top_alpha=18, bottom_alpha=16)
         _paste_cover(img, BANNER_PATH, (banner_frame[0] + 10, banner_frame[1] + 10, banner_frame[2] - 10, banner_frame[3] - 10), radius=18)
 
         gloss = Image.new("RGBA", img.size, (0, 0, 0, 0))
