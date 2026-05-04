@@ -495,6 +495,31 @@ def _draw_text_vcenter(draw: ImageDraw.ImageDraw, box, text: str, font, fill, x=
     draw.text((x, y), text, font=font, fill=fill)
 
 
+def _draw_text_centered(draw: ImageDraw.ImageDraw, box, text: str, font, fill, y_offset: int = 0):
+    """True bbox-aware text centering for pill labels.
+
+    Pillow font bboxes often have non-zero top/left offsets; using only text height
+    makes bold all-caps labels look low or off-center inside pills.
+    """
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    box_w = box[2] - box[0]
+    box_h = box[3] - box[1]
+    x = box[0] + (box_w - text_w) / 2 - bbox[0]
+    y = box[1] + (box_h - text_h) / 2 - bbox[1] + y_offset
+    draw.text((x, y), text, font=font, fill=fill)
+
+
+def _draw_text_left_centered_on_y(draw: ImageDraw.ImageDraw, x: int | float, center_y: int | float, text: str, font, fill, y_offset: int = 0):
+    """Draw text with its visual left edge at x and visual center on center_y."""
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_h = bbox[3] - bbox[1]
+    draw_x = x - bbox[0]
+    draw_y = center_y - text_h / 2 - bbox[1] + y_offset
+    draw.text((draw_x, draw_y), text, font=font, fill=fill)
+
+
 def _unit_display(unit: str) -> str:
     value = str(unit or "").strip().upper().replace("UNITS", "").replace("UNIT", "").replace("U", "").strip()
     if not value:
@@ -1010,7 +1035,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         odds_chip_w = max(208, odds_text_w + 84)
         odds_chip = (content_right - odds_chip_w, top_y, content_right, top_y + chip_h)
         _draw_glossy_panel(img, odds_chip, 16, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 10), gloss_alpha=18)
-        _draw_text_vcenter(draw, odds_chip, primary_odds, odds_font, white, x=odds_chip[0] + ((odds_chip[2] - odds_chip[0]) - odds_text_w) / 2, y_offset=0)
+        _draw_text_centered(draw, odds_chip, primary_odds, odds_font, white)
 
     if primary_unit:
         unit_font = _font(26, True)
@@ -1019,7 +1044,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         unit_right = odds_chip[0] - pill_gap if odds_chip else content_right
         unit_chip = (unit_right - unit_chip_w, top_y, unit_right, top_y + chip_h)
         _draw_glossy_panel(img, unit_chip, 16, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 10), gloss_alpha=18)
-        _draw_text_vcenter(draw, unit_chip, primary_unit, unit_font, green, x=unit_chip[0] + ((unit_chip[2] - unit_chip[0]) - unit_text_w) / 2, y_offset=0)
+        _draw_text_centered(draw, unit_chip, primary_unit, unit_font, green)
 
     section_y = top_y + chip_h + 16
     if market_type == "moneyline":
@@ -1045,8 +1070,8 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         history_text = str(play.get("history", "") or "").strip()
 
         if single_moneyline_layout:
-            # Moneyline single-play layout: player name + MONEYLINE pill on the left,
-            # and a larger odds pill centered on the right side of the play row.
+            # Moneyline single-play layout: all three visual elements on one
+            # shared centerline: player name, MONEYLINE pill, and odds pill.
             check_size = 54
             inner_left_pad = 20
             icon_text_gap = 18
@@ -1072,39 +1097,42 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
             row_right_pad = 18
             odds_text = _odds_display(play.get("odds", "") or primary_odds)
-            odds_chip = None
+            odds_font = _font(32, True)
+            odds_text_w = _text_width(draw, odds_text, odds_font) if odds_text else 0
+            odds_chip_w = max(176, odds_text_w + 52) if odds_text else 0
+            odds_chip_h = 50
             odds_chip_gap = 12
             reserved_right = row_box[2] - row_right_pad
             if odds_text:
-                odds_font = _font(32, True)
-                odds_text_w = _text_width(draw, odds_text, odds_font)
-                odds_chip_w = max(176, odds_text_w + 52)
-                odds_chip_h = 50
-                odds_y = int(row_box[1] + ((row_box[3] - row_box[1]) - odds_chip_h) / 2)
-                odds_chip = (reserved_right - odds_chip_w, odds_y, reserved_right, odds_y + odds_chip_h)
-                reserved_right = odds_chip[0] - odds_chip_gap
+                reserved_right = reserved_right - odds_chip_w - odds_chip_gap
 
             content_w = max(120, reserved_right - content_x)
             max_title_w = max(80, content_w - pill_w - title_gap)
             big_bet, big_font = _fit_text(draw, title_text, max_title_w, 47, True, 32)
+            title_w = _text_width(draw, big_bet, big_font)
             title_h = _text_height(draw, big_bet, big_font)
+
             text_gap = 9
-            text_group_h = _text_height(draw, sub_label, label_font) + text_gap + max(title_h, pill_h)
+            label_h = _text_height(draw, sub_label, label_font)
+            title_line_h = max(title_h, pill_h, odds_chip_h if odds_text else 0)
+            text_group_h = label_h + text_gap + title_line_h
             text_group_y = int(row_box[1] + ((row_box[3] - row_box[1]) - text_group_h) / 2) - 1
             draw.text((content_x, text_group_y), sub_label, font=label_font, fill=off_white)
-            pick_y = text_group_y + _text_height(draw, sub_label, label_font) + text_gap - 1
-            draw.text((content_x, pick_y), big_bet, font=big_font, fill=white)
-            title_w = _text_width(draw, big_bet, big_font)
-            pill_y = int(pick_y + max(0, (title_h - pill_h) / 2) + 1)
-            market_chip = (content_x + title_w + title_gap, pill_y, content_x + title_w + title_gap + pill_w, pill_y + pill_h)
-            _draw_glossy_panel(img, market_chip, 18, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
-            _draw_text_vcenter(draw, market_chip, pill_text, pill_font, green, x=market_chip[0] + ((market_chip[2] - market_chip[0]) - pill_text_w) / 2, y_offset=0)
 
-            if odds_chip:
+            title_center_y = text_group_y + label_h + text_gap + title_line_h / 2
+            _draw_text_left_centered_on_y(draw, content_x, title_center_y, big_bet, big_font, white)
+
+            market_chip_x1 = content_x + title_w + title_gap
+            market_chip = (market_chip_x1, int(title_center_y - pill_h / 2), market_chip_x1 + pill_w, int(title_center_y - pill_h / 2) + pill_h)
+            _draw_glossy_panel(img, market_chip, 18, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
+            _draw_text_centered(draw, market_chip, pill_text, pill_font, green)
+
+            if odds_text:
+                odds_right = row_box[2] - row_right_pad
+                odds_chip = (odds_right - odds_chip_w, int(title_center_y - odds_chip_h / 2), odds_right, int(title_center_y - odds_chip_h / 2) + odds_chip_h)
                 _draw_glossy_panel(img, odds_chip, 16, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 10), gloss_alpha=18)
-                odds_font = _font(32, True)
-                odds_text_w = _text_width(draw, odds_text, odds_font)
-                _draw_text_vcenter(draw, odds_chip, odds_text, odds_font, white, x=odds_chip[0] + ((odds_chip[2] - odds_chip[0]) - odds_text_w) / 2, y_offset=0)
+                _draw_text_centered(draw, odds_chip, odds_text, odds_font, white)
+
         else:
             num_chip = (row_box[0] + 18, row_box[1] + 21, row_box[0] + 60, row_box[1] + 63)
             _draw_glossy_panel(img, num_chip, 14, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
