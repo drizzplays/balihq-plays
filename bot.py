@@ -1009,7 +1009,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             draw.line((check_wrap[0] + 15, check_wrap[1] + 29, check_wrap[0] + 24, check_wrap[1] + 38), fill=green_check, width=6)
             draw.line((check_wrap[0] + 23, check_wrap[1] + 38, check_wrap[0] + 38, check_wrap[1] + 18), fill=green_check, width=6)
 
-            content_x = row_box[0] + ICON_COL_W + TEXT_COL_GAP + 4
+            content_x = row_box[0] + ICON_COL_W + TEXT_COL_GAP + 1
             content_w = row_box[2] - content_x - RIGHT_GUTTER
             sub_label = "OFFICIAL PLAY"
             label_font = _font(15, True)
