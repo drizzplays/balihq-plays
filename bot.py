@@ -818,7 +818,10 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     header_h = 84
     hero_h = 118
     chip_h = 56
-    row_h = 100 if single_moneyline_layout else 84
+    # Single moneyline cards need a little extra vertical breathing room.
+    # The old 100px row made the large play text sit too low and feel cramped
+    # against the bottom border in the posted Discord image.
+    row_h = 112 if single_moneyline_layout else 84
     row_gap = 0 if single_moneyline_layout else 12
     rows_h = play_count * row_h + max(0, play_count - 1) * row_gap
     banner_h = 358
@@ -831,8 +834,8 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     header_y = 34
     hero_y = header_y + header_h + 18
     board_y = hero_y + hero_h + 18
-    rows_top = board_y + (98 if single_moneyline_layout else 112)
-    banner_y = rows_top + rows_h + 18
+    rows_top = board_y + (108 if single_moneyline_layout else 112)
+    banner_y = rows_top + rows_h + (24 if single_moneyline_layout else 18)
     board_bottom = banner_y + banner_h + 20
     total_h = board_bottom + 40
     shell = (shell_x1, 18, shell_x2, total_h - 18)
@@ -957,8 +960,12 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         history_text = str(play.get("history", "") or "").strip()
 
         if single_moneyline_layout:
-            # simplified premium single-moneyline row
-            check_wrap = (row_box[0] + 20, row_box[1] + 26, row_box[0] + 72, row_box[1] + 78)
+            # Simplified premium single-moneyline row with centered icon and
+            # balanced type stack. This prevents the large bet text from
+            # riding the bottom border on generated Discord cards.
+            check_size = 52
+            check_y = int(row_box[1] + ((row_box[3] - row_box[1]) - check_size) / 2)
+            check_wrap = (row_box[0] + 20, check_y, row_box[0] + 20 + check_size, check_y + check_size)
             _draw_glossy_panel(img, check_wrap, 15, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=10)
             green_check = (132, 255, 55)
             draw.line((check_wrap[0] + 14, check_wrap[1] + 28, check_wrap[0] + 23, check_wrap[1] + 37), fill=green_check, width=6)
@@ -967,10 +974,15 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             content_x = check_wrap[2] + 20
             content_w = row_box[2] - content_x - 24
             sub_label = "OFFICIAL PLAY"
-            draw.text((content_x, row_box[1] + 24), sub_label, font=_font(15, True), fill=off_white)
+            label_font = _font(15, True)
+            draw.text((content_x, row_box[1] + 24), sub_label, font=label_font, fill=off_white)
 
-            big_bet, big_font = _fit_text(draw, bet_text, content_w, 48, True, 36)
-            draw.text((content_x, row_box[1] + 49), big_bet, font=big_font, fill=white)
+            big_bet, big_font = _fit_text(draw, bet_text, content_w, 48, True, 34)
+            bet_bbox = draw.textbbox((0, 0), big_bet, font=big_font)
+            bet_h = bet_bbox[3] - bet_bbox[1]
+            bet_y = row_box[1] + 55
+            max_bet_y = row_box[3] - bet_h - 14
+            draw.text((content_x, min(bet_y, max_bet_y)), big_bet, font=big_font, fill=white)
         else:
             num_chip = (row_box[0] + 18, row_box[1] + 21, row_box[0] + 60, row_box[1] + 63)
             _draw_glossy_panel(img, num_chip, 14, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
