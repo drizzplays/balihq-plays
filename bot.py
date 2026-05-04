@@ -147,6 +147,12 @@ def _parse_est_datetime(row: dict) -> datetime | None:
 
 
 def _is_post_time(row: dict) -> tuple[bool, str]:
+    est_text = _get_value(row, "EST", fallback="").strip().upper()
+
+    # Live tab can use EST = LIVE or NOW to post on the next bot run.
+    if est_text in {"LIVE", "NOW"}:
+        return True, "Live play marked for immediate posting"
+
     play_time = _parse_est_datetime(row)
 
     if not play_time:
@@ -366,24 +372,66 @@ def _format_moneyline_bet(bet: str, row: dict, index: int) -> str:
     return raw or "No Moneyline Found"
 
 
+def _format_live_bet(bet: str, row: dict, index: int) -> tuple[str, str]:
+    """Build the live-play card text from BET + optional scenario columns."""
+    normalized = _normalize_row(row)
+    bet = str(bet or "").strip()
+
+    scenario = _get_numbered_value(
+        normalized,
+        index,
+        "scenario",
+        "condition",
+        "if",
+        "live scenario",
+        "trigger",
+    )
+
+    if bet and not bet.lower().startswith("bet:"):
+        bet = f"Bet: {bet}"
+
+    return bet or "No Live Bet Found", scenario
+
+
 def _collect_plays(row: dict, forced_market_type: str | None = None) -> list[dict]:
     normalized = _normalize_row(row)
 
-    bet_values = _iter_numbered_values(normalized, ("bet", "play", "pick", "selection"))
+    # Totals and Live Plays use BET, BET 2, BET 3 and skip blanks.
+    # Moneylines uses BET by default, then checks BET 2 / BET 3 / BET 4 and skips blanks.
+    initial_market_type = forced_market_type or _detect_market_type(row)
+    if initial_market_type in ("totals", "live"):
+        max_bets = 3
+    elif initial_market_type == "moneyline":
+        max_bets = 4
+    else:
+        max_bets = 10
+
+    bet_values = _iter_numbered_values(normalized, ("bet", "play", "pick", "selection"), max_items=max_bets)
     market_type = forced_market_type or _detect_market_type(row, [{"bet": value} for value in bet_values])
+
+    # Safety clamp in case market detection changes after reading the bet text.
+    if market_type in ("totals", "live"):
+        bet_values = bet_values[:3]
+    elif market_type == "moneyline":
+        bet_values = bet_values[:4]
 
     if not bet_values:
         default_unit = _get_numbered_value(normalized, 1, "unit", "units", "stake")
-        return [{"bet": "No Bet Found", "history": "", "unit": default_unit, "market_type": market_type}]
+        return [{"bet": "No Bet Found", "history": "", "unit": default_unit, "market_type": market_type, "scenario": ""}]
 
     plays = []
     for index, bet in enumerate(bet_values, start=1):
-        history = _get_numbered_value(normalized, index, "history", "unit history", "record")
+        # History is only used on totals cards. Moneylines and live plays ignore it
+        # so those cards stay clean while MATCH ID remains available for recaps.
+        history = "" if market_type in ("moneyline", "live") else _get_numbered_value(normalized, index, "history", "unit history", "record")
         unit = _get_numbered_value(normalized, index, "unit", "units", "stake")
         odds = _get_numbered_value(normalized, index, "odds", "price", "line")
+        scenario = ""
 
         if market_type == "moneyline":
             bet = _format_moneyline_bet(bet, row, index)
+        elif market_type == "live":
+            bet, scenario = _format_live_bet(bet, row, index)
 
         plays.append(
             {
@@ -392,6 +440,7 @@ def _collect_plays(row: dict, forced_market_type: str | None = None) -> list[dic
                 "unit": unit,
                 "odds": odds,
                 "market_type": market_type,
+                "scenario": scenario,
             }
         )
 
@@ -505,6 +554,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     est = _get_value(row, "EST")
     player_1 = _get_value(row, "Player 1", "Player1", fallback="TBD")
     player_2 = _get_value(row, "Player 2", "Player2", fallback="TBD")
+    match_id = _get_value(row, "MATCH ID", "Match ID", "match_id", fallback="").strip()
 
     plays = _collect_plays(row, forced_market_type=forced_market_type)
     market_type = forced_market_type or _detect_market_type(row, plays)
@@ -631,6 +681,13 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     play_word = "PLAY" if play_count == 1 else "PLAYS"
     draw.text((count_chip[0] + 16, chip_y + 10), f"{play_count} {play_word}", font=_font(18, True), fill=green)
 
+    if match_id:
+        match_chip = (count_chip[2] + 18, chip_y, count_chip[2] + 258, chip_y + chip_h)
+        _rounded_rect(draw, match_chip, 16, fill=(14, 22, 26), outline=(54, 73, 80), width=1)
+        match_label = f"MATCH ID {match_id}"
+        match_text, match_font = _fit_text(draw, match_label, match_chip[2] - match_chip[0] - 24, 18, True, 12)
+        draw.text((match_chip[0] + 12, chip_y + 11), match_text, font=match_font, fill=off_white)
+
     if primary_unit:
         unit_chip = (board[2] - 156, chip_y, board[2] - 22, chip_y + chip_h)
         _rounded_rect(draw, unit_chip, 16, fill=(13, 24, 17), outline=(74, 121, 78), width=1)
@@ -691,12 +748,17 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             draw.text((main_x, current_y + 16), bet_fit, font=bet_font, fill=white)
 
         meta_parts = []
+        scenario_text = str(play.get("scenario", "") or "").strip()
+        if scenario_text:
+            meta_parts.append(f"If {scenario_text}" if not scenario_text.lower().startswith("if ") else scenario_text)
         if play.get("unit"):
             meta_parts.append(_format_unit(play.get("unit", "")))
-        if history_text:
-            meta_parts.append(("Record " if market_type == "moneyline" else "History ") + history_text)
+        if history_text and market_type == "totals":
+            meta_parts.append("History " + history_text)
         if meta_parts:
-            draw.text((main_x, current_y + 50), "   •   ".join(meta_parts), font=_font(15, False), fill=off_white)
+            meta_line = "   •   ".join(meta_parts)
+            meta_fit, meta_font = _fit_text(draw, meta_line, max_main_w, 15, False, 11)
+            draw.text((main_x, current_y + 50), meta_fit, font=meta_font, fill=off_white)
 
         draw.rounded_rectangle((row_x2 - 12, current_y + 16, row_x2 - 7, current_y + row_h - 16), radius=3, fill=(110, 240, 0))
         current_y += row_h + row_gap
@@ -841,13 +903,15 @@ def _run_sheet_tab(sheet, forced_market_type: str) -> int:
         print(f"ℹ️ {tab_name}: No eligible plays to post right now.")
         return 0
 
-    eligible_rows.sort(key=lambda item: item[0])
+    eligible_rows.sort(key=lambda item: item[0] or datetime.min.replace(tzinfo=EST_TZ))
     posted_count = 0
 
     webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
 
     for play_time, row_number, row in eligible_rows[:MAX_POSTS_PER_RUN]:
-        print(f"✅ {tab_name}: Posting {forced_market_type} play for row {row_number}: {row.get('Player 1')} vs {row.get('Player 2')}")
+        match_id = _get_value(row, "MATCH ID", "Match ID", fallback="").strip()
+        match_id_log = f" | MATCH ID {match_id}" if match_id else ""
+        print(f"✅ {tab_name}: Posting {forced_market_type} play for row {row_number}: {row.get('Player 1')} vs {row.get('Player 2')}{match_id_log}")
 
         card_path = _generate_pick_card(row, forced_market_type=forced_market_type)
         response = _post_card_to_discord(webhook_url, card_path)
