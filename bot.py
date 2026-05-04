@@ -786,7 +786,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     header_h = 84
     hero_h = 104
     chip_h = 40
-    row_h = 128 if single_moneyline_layout else 84
+    row_h = 102 if single_moneyline_layout else 84
     row_gap = 0 if single_moneyline_layout else 12
     rows_h = play_count * row_h + max(0, play_count - 1) * row_gap
     banner_h = 358
@@ -922,45 +922,27 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         history_text = str(play.get("history", "") or "").strip()
 
         if single_moneyline_layout:
-            # redesigned featured single-moneyline block with a cleaner web-style split layout
-            inner_box = (row_box[0] + 14, row_box[1] + 10, row_box[2] - 14, row_box[3] - 10)
-            _draw_glossy_panel(img, inner_box, 16, (18, 27, 32, 235), (10, 15, 19, 235), outline=(40, 53, 60), inner_outline=(255, 255, 255, 8), gloss_alpha=12)
-            draw.rounded_rectangle((inner_box[0] + 10, inner_box[1] + 10, inner_box[0] + 14, inner_box[3] - 10), radius=3, fill=green)
-
-            side_box = (inner_box[2] - 168, inner_box[1] + 10, inner_box[2] - 10, inner_box[3] - 10)
-            _draw_glossy_panel(img, side_box, 14, (20, 31, 36, 255), (11, 17, 21, 255), outline=(50, 64, 72), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
-
-            unit_value = _unit_display(play.get("unit", "")) or primary_unit
-            side_label_font = _font(12, True)
-            draw.text((side_box[0] + 16, side_box[1] + 12), "UNIT SIZE", font=side_label_font, fill=muted)
-            if unit_value:
-                unit_font = _font(24, True)
-                unit_w = _text_width(draw, unit_value, unit_font)
-                draw.text((side_box[0] + ((side_box[2] - side_box[0]) - unit_w) / 2, side_box[1] + 38), unit_value, font=unit_font, fill=green)
-            play_id = "PLAY 01"
-            play_id_w = _text_width(draw, play_id, _font(12, True))
-            draw.text((side_box[0] + ((side_box[2] - side_box[0]) - play_id_w) / 2, side_box[3] - 24), play_id, font=_font(12, True), fill=off_white)
-
-            check_wrap = (inner_box[0] + 18, inner_box[1] + 24, inner_box[0] + 66, inner_box[1] + 72)
-            _draw_glossy_panel(img, check_wrap, 14, (23, 37, 27, 255), (11, 18, 14, 255), outline=(64, 98, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
-            _draw_check(draw, check_wrap[0] + 7, check_wrap[1] + 6)
+            # simplified high-end single-moneyline module
+            check_wrap = (row_box[0] + 22, row_box[1] + 26, row_box[0] + 72, row_box[1] + 76)
+            _draw_glossy_panel(img, check_wrap, 15, (23, 37, 27, 255), (11, 18, 14, 255), outline=(64, 98, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
+            _draw_check(draw, check_wrap[0] + 8, check_wrap[1] + 7)
 
             content_x = check_wrap[2] + 18
-            content_w = side_box[0] - content_x - 20
+            content_w = row_box[2] - content_x - 34
             badge_font = _font(13, True)
             label = "FEATURED PICK"
             label_w = _text_width(draw, label, badge_font)
-            label_chip = (content_x, inner_box[1] + 10, content_x + label_w + 22, inner_box[1] + 36)
+            label_chip = (content_x, row_box[1] + 16, content_x + label_w + 22, row_box[1] + 42)
             _draw_glossy_panel(img, label_chip, 12, (24, 37, 27, 255), (11, 18, 14, 255), outline=(64, 98, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
             _draw_text_vcenter(draw, label_chip, label, badge_font, green, x=label_chip[0] + 11)
 
+            big_bet, big_font = _fit_text(draw, bet_text, content_w, 38, True, 28)
+            draw.text((content_x, row_box[1] + 46), big_bet, font=big_font, fill=white)
+
             sub_label = "OFFICIAL MONEYLINE PLAY"
-            draw.text((content_x, inner_box[1] + 42), sub_label, font=_font(13, True), fill=off_white)
+            draw.text((content_x, row_box[1] + 78), sub_label, font=_font(13, True), fill=off_white)
 
-            big_bet, big_font = _fit_text(draw, bet_text, content_w, 40, True, 28)
-            draw.text((content_x, inner_box[1] + 60), big_bet, font=big_font, fill=white)
-
-            draw.rounded_rectangle((row_box[2] - 12, row_box[1] + 18, row_box[2] - 8, row_box[3] - 18), radius=3, fill=green)
+            draw.rounded_rectangle((row_box[2] - 12, row_box[1] + 16, row_box[2] - 8, row_box[3] - 16), radius=3, fill=green)
         else:
             num_chip = (row_box[0] + 18, row_box[1] + 21, row_box[0] + 60, row_box[1] + 63)
             _draw_glossy_panel(img, num_chip, 14, (24, 37, 27, 255), (11, 18, 14, 255), outline=(64, 98, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
