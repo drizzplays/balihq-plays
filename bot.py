@@ -16,7 +16,7 @@ except ImportError as exc:
     raise RuntimeError("Pillow is required. Add pillow to requirements.txt") from exc
 
 
-DISCORD_EMBED_COLOR = 0x7CFF00
+DISCORD_EMBED_COLOR = 0x3498DB
 ROLE_ID = "1500237161335881768"
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -348,12 +348,15 @@ def _draw_league_chip(img: Image.Image, draw: ImageDraw.ImageDraw, box, league: 
     text_max_width = (box[2] - box[0]) - 32
 
     if icon_path:
-        icon_wrap = (box[0] + 10, box[1] + 5, box[0] + 46, box[1] + 35)
+        chip_h = box[3] - box[1]
+        icon_h = min(36, chip_h - 10)
+        icon_y1 = int(box[1] + (chip_h - icon_h) / 2)
+        icon_wrap = (box[0] + 10, icon_y1, box[0] + 10 + icon_h, icon_y1 + icon_h)
         _draw_glossy_panel(img, icon_wrap, 10, (30, 40, 46, 255), (14, 19, 24, 255), outline=(66, 82, 90), inner_outline=(255, 255, 255, 10), gloss_alpha=24)
-        icon_box = (icon_wrap[0] + 4, icon_wrap[1] + 3, icon_wrap[2] - 4, icon_wrap[3] - 3)
+        icon_box = (icon_wrap[0] + 4, icon_wrap[1] + 4, icon_wrap[2] - 4, icon_wrap[3] - 4)
         _paste_contain(img, icon_path, icon_box)
-        text_x = icon_wrap[2] + 12
-        text_max_width = box[2] - text_x - 16
+        text_x = icon_wrap[2] + 14
+        text_max_width = box[2] - text_x - 18
 
     league_text, league_font = _fit_text(draw, str(league).upper(), text_max_width, 22, True, 15)
     _draw_text_vcenter(draw, box, league_text, league_font, text_color, x=text_x)
@@ -785,7 +788,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
     header_h = 84
     hero_h = 104
-    chip_h = 40
+    chip_h = 46
     row_h = 96 if single_moneyline_layout else 84
     row_gap = 0 if single_moneyline_layout else 12
     rows_h = play_count * row_h + max(0, play_count - 1) * row_gap
@@ -799,7 +802,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     header_y = 34
     hero_y = header_y + header_h + 18
     board_y = hero_y + hero_h + 18
-    rows_top = board_y + 100
+    rows_top = board_y + (78 if single_moneyline_layout else 100)
     banner_y = rows_top + rows_h + 18
     board_bottom = banner_y + banner_h + 20
     total_h = board_bottom + 40
@@ -832,12 +835,17 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     draw.rounded_rectangle((shell[0] + 12, shell[1] + 12, shell[2] - 12, shell[3] - 12), radius=26, outline=(14, 21, 27), width=1)
 
     # header
-    header = (left, header_y, right, header_y + header_h)
+    header = (left + 14, header_y, right - 14, header_y + header_h)
     _draw_drop_shadow(img, header, radius=22, offset=(0, 8), blur=18, alpha=72)
     _draw_glossy_panel(img, header, 22, (16, 24, 30, 255), (7, 11, 15, 255), outline=(42, 56, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=18)
     _paste_circle(img, AVATAR_PATH, (header[0] + 16, header[1] + 18, header[0] + 62, header[1] + 64), border=0)
     draw.text((header[0] + 78, header[1] + 11), BRAND_NAME, font=_font(28, True), fill=white)
-    draw.text((header[0] + 80, header[1] + 48), "PLAY STARTING IN 5 MINUTES", font=_font(16, True), fill=green)
+    alert_inline = "📢 Bet Alert  "
+    alert_font = _font(16, True)
+    alert_x = header[0] + 80
+    alert_y = header[1] + 48
+    draw.text((alert_x, alert_y), alert_inline, font=alert_font, fill=green)
+    draw.text((alert_x + _text_width(draw, alert_inline, alert_font), alert_y), "PLAY STARTING IN 5 MINUTES", font=alert_font, fill=muted)
 
     badge = (right - 126, header[1] + 14, right - 12, header[3] - 14)
     _draw_glossy_panel(img, badge, 18, (17, 25, 30, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
@@ -879,33 +887,34 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     _draw_drop_shadow(img, board, radius=28, offset=(0, 14), blur=24, alpha=84)
     _draw_glossy_panel(img, board, 28, (18, 25, 30, 255), (8, 12, 16, 255), outline=(40, 53, 60), inner_outline=(255, 255, 255, 8), gloss_alpha=12)
 
-    top_y = board_y + 20
+    top_y = board_y + 18
     league_font = _font(22, True)
     league_text = str(league).upper()
     league_icon = _league_icon_path(league)
     league_text_w = _text_width(draw, league_text, league_font)
-    league_chip_w = max(224, league_text_w + (70 if league_icon else 34))
+    league_chip_w = max(260, league_text_w + (78 if league_icon else 44))
     league_chip = (board[0] + 20, top_y, board[0] + 20 + league_chip_w, top_y + chip_h)
     _draw_league_chip(img, draw, league_chip, league, text_color=white)
 
     if primary_unit:
         unit_text_w = _text_width(draw, primary_unit, _font(18, True))
-        unit_chip_w = max(142, unit_text_w + 44)
+        unit_chip_w = max(164, unit_text_w + 58)
         unit_chip = (board[2] - 20 - unit_chip_w, top_y, board[2] - 20, top_y + chip_h)
         _draw_glossy_panel(img, unit_chip, 16, (24, 37, 27, 255), (11, 18, 14, 255), outline=(70, 104, 70), inner_outline=(255, 255, 255, 10), gloss_alpha=18)
         _draw_text_vcenter(draw, unit_chip, primary_unit, _font(18, True), green, x=unit_chip[0] + ((unit_chip[2] - unit_chip[0]) - unit_text_w) / 2)
 
     section_y = board_y + 72
     if market_type == "moneyline":
-        section = "MONEYLINE" if play_count == 1 else "MONEYLINES"
+        section = "" if play_count == 1 else "MONEYLINES"
     elif market_type == "live":
         section = "LIVE PLAYS"
     else:
         section = "OFFICIAL PLAYS"
-    draw.text((board[0] + 20, section_y), section, font=_font(18, True), fill=(205, 211, 216))
-    if play_count > 1:
-        draw.text((board[0] + 20 + _text_width(draw, section, _font(18, True)) + 14, section_y + 4), f"• {play_count} PLAYS", font=_font(14, True), fill=muted)
-    draw.line((board[0] + 20, section_y + 28, board[2] - 20, section_y + 28), fill=(21, 30, 37), width=1)
+    if section:
+        draw.text((board[0] + 20, section_y), section, font=_font(18, True), fill=(205, 211, 216))
+        if play_count > 1:
+            draw.text((board[0] + 20 + _text_width(draw, section, _font(18, True)) + 14, section_y + 4), f"• {play_count} PLAYS", font=_font(14, True), fill=muted)
+        draw.line((board[0] + 20, section_y + 28, board[2] - 20, section_y + 28), fill=(21, 30, 37), width=1)
 
     row_x1 = board[0] + 20
     row_x2 = board[2] - 20
@@ -927,7 +936,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
             content_x = check_wrap[2] + 16
             content_w = row_box[2] - content_x - 22
-            sub_label = "OFFICIAL MONEYLINE PLAY"
+            sub_label = "OFFICIAL PLAY"
             draw.text((content_x, row_box[1] + 18), sub_label, font=_font(13, True), fill=off_white)
 
             big_bet, big_font = _fit_text(draw, bet_text, content_w, 42, True, 31)
@@ -1006,7 +1015,7 @@ def _build_embed_payload(card_file_name: str, avatar_file_name: str | None = Non
         embed["footer"]["icon_url"] = avatar_url
 
     return {
-        "content": f"<@&{ROLE_ID}>\n📢 Bet Alert",
+        "content": f"<@&{ROLE_ID}>",
         "allowed_mentions": {"roles": [ROLE_ID]},
         "embeds": [embed],
     }
