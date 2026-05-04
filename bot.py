@@ -817,12 +817,12 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     LEFT_GUTTER = INNER_PAD
     RIGHT_GUTTER = INNER_PAD
     ICON_COL_W = 86
-    TEXT_COL_GAP = 44
+    TEXT_COL_GAP = 37
     BADGE_H = 56
     PLAY_ROW_H = 122
     MODULE_GAP = 24
-    CONTENT_ROW_GAP = MODULE_GAP
-    BANNER_TOP_GAP = MODULE_GAP
+    CONTENT_ROW_GAP = MODULE_GAP - 8  # micro-fix: tighten badge row -> official play gap only
+    BANNER_TOP_GAP = MODULE_GAP - 8   # micro-fix: tighten official play -> banner gap only
     BOARD_TOP_GUTTER = INNER_PAD
     BOARD_BOTTOM_GUTTER = MODULE_GAP
 
