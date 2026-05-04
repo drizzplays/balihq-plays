@@ -888,7 +888,12 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
     # banner
     banner_frame = (board[0] + 22, banner_y, board[2] - 22, banner_y + banner_h)
-    if market_type in ("moneyline", "live"):
+    if market_type == "moneyline":
+        _rounded_rect(draw, banner_frame, 22, fill=(11, 17, 20), outline=(55, 73, 80), width=1)
+        _add_panel_gloss(img, banner_frame, radius=22, top_alpha=18, bottom_alpha=16)
+        banner_source = MONEYLINES_BANNER_PATH if MONEYLINES_BANNER_PATH.exists() else BANNER_PATH
+        _paste_cover(img, banner_source, (banner_frame[0] + 10, banner_frame[1] + 10, banner_frame[2] - 10, banner_frame[3] - 10), radius=18)
+    elif market_type == "live":
         _draw_market_banner(img, banner_frame, market_type)
     else:
         _rounded_rect(draw, banner_frame, 22, fill=(11, 17, 20), outline=(55, 73, 80), width=1)
