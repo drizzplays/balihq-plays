@@ -274,6 +274,65 @@ def _paste_circle(canvas: Image.Image, image_path: Path, box: tuple[int, int, in
     canvas.alpha_composite(circ, (x, y))
 
 
+def _slugify_league_name(value: str) -> str:
+    value = str(value or "").strip().lower()
+    value = re.sub(r"[^a-z0-9]+", "_", value)
+    return value.strip("_")
+
+
+def _league_icon_path(league: str) -> Path | None:
+    """Return a league-specific icon from /images when available.
+
+    Current hard map:
+    - any league containing 'elite' -> images/tt_elite.png
+
+    Fallback:
+    - tries a slugified filename like images/tt_elite.png for a league named TT Elite
+    """
+    league_text = str(league or "").strip()
+    normalized = league_text.lower()
+
+    candidates = []
+    if "elite" in normalized:
+        candidates.append(IMAGES_DIR / "tt_elite.png")
+
+    slug = _slugify_league_name(league_text)
+    if slug:
+        candidates.append(IMAGES_DIR / f"{slug}.png")
+
+    seen = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if candidate.exists():
+            return candidate
+
+    return None
+
+
+def _draw_league_chip(img: Image.Image, draw: ImageDraw.ImageDraw, box, league: str, text_color=(246, 247, 248)):
+    chip_fill = (14, 22, 26)
+    chip_outline = (54, 73, 80)
+    _rounded_rect(draw, box, 16, fill=chip_fill, outline=chip_outline, width=1)
+
+    icon_path = _league_icon_path(league)
+    text_x = box[0] + 16
+    text_max_width = (box[2] - box[0]) - 32
+
+    if icon_path:
+        icon_box = (box[0] + 10, box[1] + 6, box[0] + 42, box[1] + 38)
+        _paste_contain(img, icon_path, icon_box)
+        text_x = icon_box[2] + 10
+        text_max_width = box[2] - text_x - 14
+
+    league_text, league_font = _fit_text(draw, str(league).upper(), text_max_width, 23, True, 15)
+    text_bbox = draw.textbbox((0, 0), league_text, font=league_font)
+    text_h = text_bbox[3] - text_bbox[1]
+    text_y = box[1] + ((box[3] - box[1]) - text_h) / 2 - 1
+    draw.text((text_x, text_y), league_text, font=league_font, fill=text_color)
+
+
 def _draw_soft_glow(base: Image.Image, box, radius: int, color=(124, 255, 0, 100), border=4):
     glow = Image.new("RGBA", base.size, (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
@@ -673,9 +732,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
     chip_y = board_y + 22
     league_chip = (board[0] + 22, chip_y, board[0] + 292, chip_y + chip_h)
-    _rounded_rect(draw, league_chip, 16, fill=(14, 22, 26), outline=(54, 73, 80), width=1)
-    league_text, league_font = _fit_text(draw, league.upper(), 220, 23, True, 15)
-    draw.text((league_chip[0] + 16, chip_y + 10), league_text, font=league_font, fill=white)
+    _draw_league_chip(img, draw, league_chip, league, text_color=white)
 
     count_chip = (league_chip[2] + 18, chip_y, league_chip[2] + 176, chip_y + chip_h)
     _rounded_rect(draw, count_chip, 16, fill=(13, 24, 17), outline=(74, 121, 78), width=1)
