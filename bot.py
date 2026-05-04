@@ -554,7 +554,8 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     est = _get_value(row, "EST")
     player_1 = _get_value(row, "Player 1", "Player1", fallback="TBD")
     player_2 = _get_value(row, "Player 2", "Player2", fallback="TBD")
-    match_id = _get_value(row, "MATCH ID", "Match ID", "match_id", fallback="").strip()
+    # MATCH ID is intentionally not rendered on cards.
+    # It can stay in the sheet for recap/logging workflows only.
 
     plays = _collect_plays(row, forced_market_type=forced_market_type)
     market_type = forced_market_type or _detect_market_type(row, plays)
@@ -680,13 +681,6 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     _rounded_rect(draw, count_chip, 16, fill=(13, 24, 17), outline=(74, 121, 78), width=1)
     play_word = "PLAY" if play_count == 1 else "PLAYS"
     draw.text((count_chip[0] + 16, chip_y + 10), f"{play_count} {play_word}", font=_font(18, True), fill=green)
-
-    if match_id:
-        match_chip = (count_chip[2] + 18, chip_y, count_chip[2] + 258, chip_y + chip_h)
-        _rounded_rect(draw, match_chip, 16, fill=(14, 22, 26), outline=(54, 73, 80), width=1)
-        match_label = f"MATCH ID {match_id}"
-        match_text, match_font = _fit_text(draw, match_label, match_chip[2] - match_chip[0] - 24, 18, True, 12)
-        draw.text((match_chip[0] + 12, chip_y + 11), match_text, font=match_font, fill=off_white)
 
     if primary_unit:
         unit_chip = (board[2] - 156, chip_y, board[2] - 22, chip_y + chip_h)
