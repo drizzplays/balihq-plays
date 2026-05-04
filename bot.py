@@ -20,6 +20,7 @@ DISCORD_EMBED_COLOR = 0x7CFF00
 ROLE_ID = "1500237161335881768"
 
 BASE_DIR = Path(__file__).resolve().parent
+FONT_DIR = BASE_DIR / "fonts"
 IMAGES_DIR = BASE_DIR / "images"
 AVATAR_PATH = IMAGES_DIR / "avatar.png"
 BANNER_PATH = IMAGES_DIR / "banner.png"
@@ -178,6 +179,25 @@ def _is_post_time(row: dict) -> tuple[bool, str]:
 
 
 def _font(size: int, bold: bool = False):
+    # Preferred card font. Put Lexend files in /fonts inside the project.
+    # Works with Regular only, or Bold/SemiBold if you add them later.
+    preferred = [
+        FONT_DIR / ("Lexend-Bold.ttf" if bold else "Lexend-Regular.ttf"),
+        FONT_DIR / ("Lexend-SemiBold.ttf" if bold else "Lexend-Regular.ttf"),
+        FONT_DIR / "Lexend-Regular.ttf",
+        FONT_DIR / "Lexend-Regular(3).ttf",
+        FONT_DIR / "Lexend-Regular(4).ttf",
+        Path("/fonts") / ("Lexend-Bold.ttf" if bold else "Lexend-Regular.ttf"),
+        Path("/fonts") / ("Lexend-SemiBold.ttf" if bold else "Lexend-Regular.ttf"),
+        Path("/fonts") / "Lexend-Regular.ttf",
+        Path("/fonts") / "Lexend-Regular(3).ttf",
+        Path("/fonts") / "Lexend-Regular(4).ttf",
+    ]
+
+    for path in preferred:
+        if path.exists():
+            return ImageFont.truetype(str(path), size)
+
     paths = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
@@ -358,7 +378,7 @@ def _draw_league_chip(img: Image.Image, draw: ImageDraw.ImageDraw, box, league: 
         text_x = icon_wrap[2] + 14
         text_max_width = box[2] - text_x - 18
 
-    league_text, league_font = _fit_text(draw, str(league).upper(), text_max_width, 24, True, 18)
+    league_text, league_font = _fit_text(draw, str(league).upper(), text_max_width, 25, True, 19)
     _draw_text_vcenter(draw, box, league_text, league_font, text_color, x=text_x)
 
 
@@ -811,7 +831,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     header_y = 34
     hero_y = header_y + header_h + 18
     board_y = hero_y + hero_h + 18
-    rows_top = board_y + (78 if single_moneyline_layout else 100)
+    rows_top = board_y + (98 if single_moneyline_layout else 112)
     banner_y = rows_top + rows_h + 18
     board_bottom = banner_y + banner_h + 20
     total_h = board_bottom + 40
@@ -898,7 +918,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     _draw_glossy_panel(img, board, 28, (18, 25, 30, 255), (8, 12, 16, 255), outline=(40, 53, 60), inner_outline=(255, 255, 255, 8), gloss_alpha=12)
 
     top_y = board_y + 18
-    league_font = _font(24, True)
+    league_font = _font(25, True)
     league_text = str(league).upper()
     league_icon = _league_icon_path(league)
     league_text_w = _text_width(draw, league_text, league_font)
@@ -938,19 +958,19 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
         if single_moneyline_layout:
             # simplified premium single-moneyline row
-            check_wrap = (row_box[0] + 18, row_box[1] + 25, row_box[0] + 70, row_box[1] + 77)
+            check_wrap = (row_box[0] + 20, row_box[1] + 26, row_box[0] + 72, row_box[1] + 78)
             _draw_glossy_panel(img, check_wrap, 15, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=10)
             green_check = (132, 255, 55)
             draw.line((check_wrap[0] + 14, check_wrap[1] + 28, check_wrap[0] + 23, check_wrap[1] + 37), fill=green_check, width=6)
             draw.line((check_wrap[0] + 22, check_wrap[1] + 37, check_wrap[0] + 36, check_wrap[1] + 18), fill=green_check, width=6)
 
-            content_x = check_wrap[2] + 18
+            content_x = check_wrap[2] + 20
             content_w = row_box[2] - content_x - 24
             sub_label = "OFFICIAL PLAY"
-            draw.text((content_x, row_box[1] + 23), sub_label, font=_font(15, True), fill=off_white)
+            draw.text((content_x, row_box[1] + 24), sub_label, font=_font(15, True), fill=off_white)
 
             big_bet, big_font = _fit_text(draw, bet_text, content_w, 48, True, 36)
-            draw.text((content_x, row_box[1] + 48), big_bet, font=big_font, fill=white)
+            draw.text((content_x, row_box[1] + 49), big_bet, font=big_font, fill=white)
         else:
             num_chip = (row_box[0] + 18, row_box[1] + 21, row_box[0] + 60, row_box[1] + 63)
             _draw_glossy_panel(img, num_chip, 14, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
