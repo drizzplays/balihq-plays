@@ -786,7 +786,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     header_h = 84
     hero_h = 104
     chip_h = 40
-    row_h = 92 if single_moneyline_layout else 84
+    row_h = 96 if single_moneyline_layout else 84
     row_gap = 0 if single_moneyline_layout else 12
     rows_h = play_count * row_h + max(0, play_count - 1) * row_gap
     banner_h = 358
@@ -837,9 +837,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     _draw_glossy_panel(img, header, 22, (16, 24, 30, 255), (7, 11, 15, 255), outline=(42, 56, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=18)
     _paste_circle(img, AVATAR_PATH, (header[0] + 16, header[1] + 18, header[0] + 62, header[1] + 64), border=0)
     draw.text((header[0] + 78, header[1] + 11), BRAND_NAME, font=_font(28, True), fill=white)
-    alert_label = "LIVE BET ALERT" if market_type == "live" else "BET ALERT"
-    draw.text((header[0] + 80, header[1] + 48), alert_label, font=_font(16, True), fill=green)
-    draw.text((header[0] + 80 + _text_width(draw, alert_label + "  ", _font(16, True)), header[1] + 48), "AUTO POSTED PLAY", font=_font(16, True), fill=muted)
+    draw.text((header[0] + 80, header[1] + 48), "PLAY STARTING IN 5 MINUTES", font=_font(16, True), fill=green)
 
     badge = (right - 126, header[1] + 14, right - 12, header[3] - 14)
     _draw_glossy_panel(img, badge, 18, (17, 25, 30, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
@@ -850,16 +848,16 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     _draw_drop_shadow(img, hero, radius=24, offset=(0, 10), blur=20, alpha=78)
     _draw_glossy_panel(img, hero, 24, (13, 19, 23, 255), (6, 10, 13, 255), outline=(80, 132, 82), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
 
-    time_pill = (hero[0] + 18, hero[1] + 18, hero[0] + 252, hero[1] + 72)
+    time_pill = (hero[0] + 18, hero[1] + 16, hero[0] + 276, hero[1] + 74)
     _draw_glossy_panel(img, time_pill, 18, (24, 37, 27, 255), (10, 18, 13, 255), outline=(76, 118, 74), inner_outline=(255, 255, 255, 10), gloss_alpha=20)
-    _draw_clock(draw, time_pill[0] + 14, time_pill[1] + 3)
+    _draw_clock(draw, time_pill[0] + 16, time_pill[1] + 6)
     clean_est = str(est).upper().replace("EST", "").replace("EDT", "").strip() or est
     time_text, time_font = _fit_text(draw, clean_est, 148, 24, True, 18)
-    draw.text((time_pill[0] + 72, time_pill[1] + 3), time_text, font=time_font, fill=white)
-    draw.text((time_pill[0] + 72, time_pill[1] + 28), "EST", font=_font(14, True), fill=green)
+    draw.text((time_pill[0] + 78, time_pill[1] + 5), time_text, font=time_font, fill=white)
+    draw.text((time_pill[0] + 78, time_pill[1] + 31), "EST", font=_font(14, True), fill=green)
 
-    divider_x = time_pill[2] + 20
-    draw.line((divider_x, hero[1] + 18, divider_x, hero[3] - 18), fill=(48, 60, 68), width=2)
+    divider_x = time_pill[2] + 18
+    draw.line((divider_x, hero[1] + 16, divider_x, hero[3] - 16), fill=(48, 60, 68), width=2)
     draw.text((divider_x + 20, hero[1] + 13), "MATCHUP", font=_font(14, True), fill=muted)
 
     matchup = f"{player_1} vs {player_2}"
@@ -886,18 +884,18 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     league_text = str(league).upper()
     league_icon = _league_icon_path(league)
     league_text_w = _text_width(draw, league_text, league_font)
-    league_chip_w = max(184, league_text_w + (58 if league_icon else 30))
+    league_chip_w = max(224, league_text_w + (70 if league_icon else 34))
     league_chip = (board[0] + 20, top_y, board[0] + 20 + league_chip_w, top_y + chip_h)
     _draw_league_chip(img, draw, league_chip, league, text_color=white)
 
     if primary_unit:
         unit_text_w = _text_width(draw, primary_unit, _font(18, True))
-        unit_chip_w = max(116, unit_text_w + 36)
+        unit_chip_w = max(142, unit_text_w + 44)
         unit_chip = (board[2] - 20 - unit_chip_w, top_y, board[2] - 20, top_y + chip_h)
         _draw_glossy_panel(img, unit_chip, 16, (24, 37, 27, 255), (11, 18, 14, 255), outline=(70, 104, 70), inner_outline=(255, 255, 255, 10), gloss_alpha=18)
         _draw_text_vcenter(draw, unit_chip, primary_unit, _font(18, True), green, x=unit_chip[0] + ((unit_chip[2] - unit_chip[0]) - unit_text_w) / 2)
 
-    section_y = board_y + 70
+    section_y = board_y + 72
     if market_type == "moneyline":
         section = "MONEYLINE" if play_count == 1 else "MONEYLINES"
     elif market_type == "live":
@@ -921,17 +919,19 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
         if single_moneyline_layout:
             # simplified premium single-moneyline row
-            check_wrap = (row_box[0] + 20, row_box[1] + 21, row_box[0] + 70, row_box[1] + 71)
-            _draw_glossy_panel(img, check_wrap, 15, (23, 37, 27, 255), (11, 18, 14, 255), outline=(64, 98, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
-            _draw_check(draw, check_wrap[0] + 8, check_wrap[1] + 7)
+            check_wrap = (row_box[0] + 18, row_box[1] + 23, row_box[0] + 66, row_box[1] + 71)
+            _draw_glossy_panel(img, check_wrap, 15, (23, 37, 27, 255), (11, 18, 14, 255), outline=(64, 98, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=10)
+            green_check = (132, 255, 55)
+            draw.line((check_wrap[0] + 14, check_wrap[1] + 26, check_wrap[0] + 22, check_wrap[1] + 34), fill=green_check, width=6)
+            draw.line((check_wrap[0] + 22, check_wrap[1] + 34, check_wrap[0] + 34, check_wrap[1] + 16), fill=green_check, width=6)
 
-            content_x = check_wrap[2] + 18
-            content_w = row_box[2] - content_x - 24
+            content_x = check_wrap[2] + 16
+            content_w = row_box[2] - content_x - 22
             sub_label = "OFFICIAL MONEYLINE PLAY"
             draw.text((content_x, row_box[1] + 18), sub_label, font=_font(13, True), fill=off_white)
 
-            big_bet, big_font = _fit_text(draw, bet_text, content_w, 40, True, 30)
-            draw.text((content_x, row_box[1] + 40), big_bet, font=big_font, fill=white)
+            big_bet, big_font = _fit_text(draw, bet_text, content_w, 42, True, 31)
+            draw.text((content_x, row_box[1] + 39), big_bet, font=big_font, fill=white)
         else:
             num_chip = (row_box[0] + 18, row_box[1] + 21, row_box[0] + 60, row_box[1] + 63)
             _draw_glossy_panel(img, num_chip, 14, (24, 37, 27, 255), (11, 18, 14, 255), outline=(64, 98, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
@@ -1006,7 +1006,7 @@ def _build_embed_payload(card_file_name: str, avatar_file_name: str | None = Non
         embed["footer"]["icon_url"] = avatar_url
 
     return {
-        "content": f"<@&{ROLE_ID}>",
+        "content": f"<@&{ROLE_ID}>\n📢 Bet Alert",
         "allowed_mentions": {"roles": [ROLE_ID]},
         "embeds": [embed],
     }
