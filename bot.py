@@ -369,15 +369,13 @@ def _draw_league_chip(img: Image.Image, draw: ImageDraw.ImageDraw, box, league: 
 
     if icon_path:
         chip_h = box[3] - box[1]
-        icon_h = min(40, chip_h - 10)
+        icon_h = min(40, chip_h - 8)
         icon_y1 = int(box[1] + (chip_h - icon_h) / 2)
-        # Locked to the same visual gutter as the official-play check module.
-        icon_left = box[0] + 16
-        icon_wrap = (icon_left, icon_y1, icon_left + icon_h, icon_y1 + icon_h)
+        icon_wrap = (box[0] + 16, icon_y1, box[0] + 16 + icon_h, icon_y1 + icon_h)
         _draw_glossy_panel(img, icon_wrap, 10, (30, 40, 46, 255), (14, 19, 24, 255), outline=(66, 82, 90), inner_outline=(255, 255, 255, 10), gloss_alpha=24)
         icon_box = (icon_wrap[0] + 4, icon_wrap[1] + 4, icon_wrap[2] - 4, icon_wrap[3] - 4)
         _paste_contain(img, icon_path, icon_box)
-        text_x = icon_wrap[2] + 14
+        text_x = icon_wrap[2] + 16
         text_max_width = box[2] - text_x - 18
 
     league_text, league_font = _fit_text(draw, str(league).upper(), text_max_width, 25, True, 19)
@@ -808,7 +806,17 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     single_moneyline_layout = market_type == "moneyline" and play_count == 1
 
     width = 1200
-    outer_pad = 26
+
+    # Layout grid: keep the card from drifting by tying every major module
+    # to the same hard gutters instead of one-off eyeballed offsets.
+    OUTER_PAD = 26
+    SHELL_INSET = 32
+    INNER_GUTTER = 24
+    MAJOR_GAP = 18
+    BOARD_TOP_GUTTER = 24
+    BADGE_H = 56
+    BANNER_TOP_GAP = 30
+    BOARD_BOTTOM_GUTTER = 24
 
     green = (132, 255, 55)
     white = (246, 248, 250)
@@ -819,24 +827,24 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
     header_h = 84
     hero_h = 118
-    chip_h = 56
-    row_h = 100 if single_moneyline_layout else 84
+    chip_h = BADGE_H
+    row_h = 112 if single_moneyline_layout else 84
     row_gap = 0 if single_moneyline_layout else 12
     rows_h = play_count * row_h + max(0, play_count - 1) * row_gap
     banner_h = 358
 
-    shell_x1 = outer_pad
-    shell_x2 = width - outer_pad
-    left = shell_x1 + 18
-    right = shell_x2 - 18
+    shell_x1 = OUTER_PAD
+    shell_x2 = width - OUTER_PAD
+    panel_x1 = shell_x1 + SHELL_INSET
+    panel_x2 = shell_x2 - SHELL_INSET
 
     header_y = 34
-    hero_y = header_y + header_h + 18
-    board_y = hero_y + hero_h + 18
-    rows_top = board_y + (98 if single_moneyline_layout else 112)
-    # Major module rhythm: consistent separation between play row and banner.
-    banner_y = rows_top + rows_h + 24
-    board_bottom = banner_y + banner_h + 16
+    hero_y = header_y + header_h + MAJOR_GAP
+    board_y = hero_y + hero_h + MAJOR_GAP
+    top_y = board_y + BOARD_TOP_GUTTER
+    rows_top = top_y + chip_h + (26 if single_moneyline_layout else 32)
+    banner_y = rows_top + rows_h + BANNER_TOP_GAP
+    board_bottom = banner_y + banner_h + BOARD_BOTTOM_GUTTER
     total_h = board_bottom + 40
     shell = (shell_x1, 18, shell_x2, total_h - 18)
 
@@ -867,54 +875,59 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     draw.rounded_rectangle((shell[0] + 12, shell[1] + 12, shell[2] - 12, shell[3] - 12), radius=26, outline=(14, 21, 27), width=1)
 
     # header
-    header = (left + 14, header_y, right - 14, header_y + header_h)
+    header = (panel_x1, header_y, panel_x2, header_y + header_h)
     _draw_drop_shadow(img, header, radius=22, offset=(0, 8), blur=18, alpha=72)
     _draw_glossy_panel(img, header, 22, (16, 24, 30, 255), (7, 11, 15, 255), outline=(42, 56, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=18)
-    # Header left group: match the right logo badge's breathing room.
-    header_logo_box = (header[0] + 24, header[1] + 19, header[0] + 70, header[1] + 65)
+    header_inner_x = header[0] + 24
+    header_logo_box = (header_inner_x, header[1] + 17, header_inner_x + 50, header[1] + 67)
     _paste_circle(img, AVATAR_PATH, header_logo_box, border=0)
-    title_x = header[0] + 90
-    draw.text((title_x, header[1] + 10), BRAND_NAME, font=_font(28, True), fill=white)
+
+    title_x = header_logo_box[2] + 22
+    title_y = header[1] + 13
+    alert_y = header[1] + 50
+    draw.text((title_x, title_y), BRAND_NAME, font=_font(28, True), fill=white)
     alert_font = _font(16, True)
     alert_chip_text = "BET ALERT"
     alert_chip_w = _text_width(draw, alert_chip_text, alert_font) + 24
-    alert_chip = (title_x, header[1] + 48, title_x + alert_chip_w, header[1] + 74)
+    alert_chip = (title_x + 2, alert_y, title_x + 2 + alert_chip_w, alert_y + 26)
     _draw_glossy_panel(img, alert_chip, 12, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
     _draw_text_vcenter(draw, alert_chip, alert_chip_text, alert_font, green, x=alert_chip[0] + 12)
-    draw.text((alert_chip[2] + 14, header[1] + 51), "PLAY STARTING IN 5 MINUTES", font=alert_font, fill=muted)
+    draw.text((alert_chip[2] + 16, alert_y + 3), "PLAY STARTING IN 5 MINUTES", font=alert_font, fill=muted)
 
-    badge = (right - 150, header[1] + 12, right - 24, header[3] - 12)
+    badge = (header[2] - 144, header[1] + 14, header[2] - 24, header[3] - 14)
     _draw_glossy_panel(img, badge, 18, (17, 25, 30, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
     _paste_contain(img, AVATAR_PATH, (badge[0] + 22, badge[1] + 8, badge[2] - 22, badge[3] - 8))
 
     # matchup
-    hero = (left + 14, hero_y, right - 14, hero_y + hero_h)
+    hero = (panel_x1, hero_y, panel_x2, hero_y + hero_h)
     _draw_drop_shadow(img, hero, radius=24, offset=(0, 10), blur=20, alpha=78)
     _draw_glossy_panel(img, hero, 24, (13, 19, 23, 255), (6, 10, 13, 255), outline=(42, 56, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
 
-    time_pill = (hero[0] + 18, hero[1] + 18, hero[0] + 346, hero[1] + 96)
+    time_pill = (hero[0] + INNER_GUTTER, hero[1] + 22, hero[0] + INNER_GUTTER + 318, hero[3] - 22)
     _draw_glossy_panel(img, time_pill, 18, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 10), gloss_alpha=20)
-    _draw_clock(draw, time_pill[0] + 18, time_pill[1] + 16)
+    clock_size = 46
+    clock_y = int(time_pill[1] + ((time_pill[3] - time_pill[1]) - clock_size) / 2)
+    _draw_clock(draw, time_pill[0] + 18, clock_y)
     clean_est = str(est).upper().replace("EST", "").replace("EDT", "").strip() or est
-    time_text, time_font = _fit_text(draw, clean_est, 196, 30, True, 24)
-    draw.text((time_pill[0] + 92, time_pill[1] + 14), time_text, font=time_font, fill=white)
-    draw.text((time_pill[0] + 92, time_pill[1] + 49), "EST", font=_font(16, True), fill=green)
+    time_text, time_font = _fit_text(draw, clean_est, 182, 30, True, 24)
+    est_font = _font(16, True)
+    time_group_h = _text_height(draw, time_text, time_font) + 5 + _text_height(draw, "EST", est_font)
+    time_group_y = int(time_pill[1] + ((time_pill[3] - time_pill[1]) - time_group_h) / 2) - 1
+    time_x = time_pill[0] + 92
+    draw.text((time_x, time_group_y), time_text, font=time_font, fill=white)
+    draw.text((time_x, time_group_y + _text_height(draw, time_text, time_font) + 5), "EST", font=est_font, fill=green)
 
-    # Give the time module a cleaner exit gap before the matchup column.
-    divider_x = time_pill[2] + 36
-    draw.line((divider_x, hero[1] + 18, divider_x, hero[3] - 18), fill=(48, 60, 68), width=2)
+    divider_x = time_pill[2] + 30
+    draw.line((divider_x, time_pill[1] + 6, divider_x, time_pill[3] - 6), fill=(48, 60, 68), width=2)
 
     matchup = f"{player_1} vs {player_2}"
-    matchup_text, matchup_font = _fit_text(draw, matchup, hero[2] - divider_x - 42, 27, True, 18)
+    tx = divider_x + 28
+    matchup_text, matchup_font = _fit_text(draw, matchup, hero[2] - tx - INNER_GUTTER, 27, True, 18)
     matchup_label_font = _font(14, True)
-    label_h = _text_height(draw, "MATCHUP", matchup_label_font)
-    name_h = _text_height(draw, matchup_text, matchup_font)
-    matchup_gap = 9
-    group_h = label_h + matchup_gap + name_h
-    label_y = hero[1] + ((hero[3] - hero[1]) - group_h) / 2 - 1
-    tx = divider_x + 22
-    ty = label_y + label_h + matchup_gap
-    draw.text((tx, label_y), "MATCHUP", font=matchup_label_font, fill=muted)
+    matchup_group_h = _text_height(draw, "MATCHUP", matchup_label_font) + 10 + _text_height(draw, matchup_text, matchup_font)
+    matchup_group_y = int(hero[1] + ((hero[3] - hero[1]) - matchup_group_h) / 2) - 1
+    draw.text((tx, matchup_group_y), "MATCHUP", font=matchup_label_font, fill=muted)
+    ty = matchup_group_y + _text_height(draw, "MATCHUP", matchup_label_font) + 10
     if " vs " in matchup_text and not matchup_text.endswith("..."):
         p1, p2 = matchup_text.split(" vs ", 1)
         p1_w = _text_width(draw, p1 + " ", matchup_font)
@@ -926,27 +939,27 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         draw.text((tx, ty), matchup_text, font=matchup_font, fill=white)
 
     # board
-    board = (left + 14, board_y, right - 14, board_bottom)
+    board = (panel_x1, board_y, panel_x2, board_bottom)
     _draw_drop_shadow(img, board, radius=28, offset=(0, 14), blur=24, alpha=84)
     _draw_glossy_panel(img, board, 28, (18, 25, 30, 255), (8, 12, 16, 255), outline=(40, 53, 60), inner_outline=(255, 255, 255, 8), gloss_alpha=12)
 
-    top_y = board_y + 18
+    top_y = board_y + BOARD_TOP_GUTTER
     league_font = _font(25, True)
     league_text = str(league).upper()
     league_icon = _league_icon_path(league)
     league_text_w = _text_width(draw, league_text, league_font)
     league_chip_w = max(350, league_text_w + (106 if league_icon else 74))
-    league_chip = (board[0] + 20, top_y, board[0] + 20 + league_chip_w, top_y + chip_h)
+    league_chip = (board[0] + INNER_GUTTER, top_y, board[0] + INNER_GUTTER + league_chip_w, top_y + chip_h)
     _draw_league_chip(img, draw, league_chip, league, text_color=white)
 
     if primary_unit:
         unit_text_w = _text_width(draw, primary_unit, _font(30, True))
         unit_chip_w = max(282, unit_text_w + 110)
-        unit_chip = (board[2] - 20 - unit_chip_w, top_y, board[2] - 20, top_y + chip_h)
+        unit_chip = (board[2] - INNER_GUTTER - unit_chip_w, top_y, board[2] - INNER_GUTTER, top_y + chip_h)
         _draw_glossy_panel(img, unit_chip, 16, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 10), gloss_alpha=18)
         _draw_text_vcenter(draw, unit_chip, primary_unit, _font(30, True), green, x=unit_chip[0] + ((unit_chip[2] - unit_chip[0]) - unit_text_w) / 2)
 
-    section_y = board_y + 78
+    section_y = top_y + chip_h + 16
     if market_type == "moneyline":
         section = "" if play_count == 1 else "MONEYLINES"
     elif market_type == "live":
@@ -954,13 +967,13 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     else:
         section = "OFFICIAL PLAYS"
     if section:
-        draw.text((board[0] + 20, section_y), section, font=_font(18, True), fill=(205, 211, 216))
+        draw.text((board[0] + INNER_GUTTER, section_y), section, font=_font(18, True), fill=(205, 211, 216))
         if play_count > 1:
-            draw.text((board[0] + 20 + _text_width(draw, section, _font(18, True)) + 14, section_y + 4), f"• {play_count} PLAYS", font=_font(14, True), fill=muted)
-        draw.line((board[0] + 20, section_y + 28, board[2] - 20, section_y + 28), fill=(21, 30, 37), width=1)
+            draw.text((board[0] + INNER_GUTTER + _text_width(draw, section, _font(18, True)) + 14, section_y + 4), f"• {play_count} PLAYS", font=_font(14, True), fill=muted)
+        draw.line((board[0] + INNER_GUTTER, section_y + 28, board[2] - INNER_GUTTER, section_y + 28), fill=(21, 30, 37), width=1)
 
-    row_x1 = board[0] + 20
-    row_x2 = board[2] - 20
+    row_x1 = board[0] + INNER_GUTTER
+    row_x2 = board[2] - INNER_GUTTER
     current_y = rows_top
     for idx, play in enumerate(plays, start=1):
         row_box = (row_x1, current_y, row_x2, current_y + row_h)
@@ -971,8 +984,8 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
         if single_moneyline_layout:
             # simplified premium single-moneyline row
-            # Align the official-play icon to the league icon gutter.
-            check_wrap = (row_box[0] + 16, row_box[1] + 25, row_box[0] + 68, row_box[1] + 77)
+            check_size = 52
+            check_wrap = (row_box[0] + 10, int(row_box[1] + ((row_box[3] - row_box[1]) - check_size) / 2), row_box[0] + 10 + check_size, int(row_box[1] + ((row_box[3] - row_box[1]) - check_size) / 2) + check_size)
             _draw_glossy_panel(img, check_wrap, 15, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=10)
             green_check = (132, 255, 55)
             draw.line((check_wrap[0] + 14, check_wrap[1] + 28, check_wrap[0] + 23, check_wrap[1] + 37), fill=green_check, width=6)
@@ -981,11 +994,13 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             content_x = check_wrap[2] + 22
             content_w = row_box[2] - content_x - 26
             sub_label = "OFFICIAL PLAY"
-            draw.text((content_x, row_box[1] + 26), sub_label, font=_font(15, True), fill=off_white)
-
-            # Slightly smaller and raised so the pick never presses the lower border.
-            big_bet, big_font = _fit_text(draw, bet_text, content_w, 44, True, 34)
-            draw.text((content_x, row_box[1] + 46), big_bet, font=big_font, fill=white)
+            label_font = _font(15, True)
+            big_bet, big_font = _fit_text(draw, bet_text, content_w, 43, True, 33)
+            text_gap = 8
+            text_group_h = _text_height(draw, sub_label, label_font) + text_gap + _text_height(draw, big_bet, big_font)
+            text_group_y = int(row_box[1] + ((row_box[3] - row_box[1]) - text_group_h) / 2) - 1
+            draw.text((content_x, text_group_y), sub_label, font=label_font, fill=off_white)
+            draw.text((content_x, text_group_y + _text_height(draw, sub_label, label_font) + text_gap), big_bet, font=big_font, fill=white)
         else:
             num_chip = (row_box[0] + 18, row_box[1] + 21, row_box[0] + 60, row_box[1] + 63)
             _draw_glossy_panel(img, num_chip, 14, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
@@ -1029,10 +1044,10 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
         current_y += row_h + row_gap
 
-    banner_frame = (board[0] + 20, banner_y, board[2] - 20, banner_y + banner_h)
+    banner_frame = (row_x1, banner_y, row_x2, banner_y + banner_h)
     _draw_drop_shadow(img, banner_frame, radius=22, offset=(0, 10), blur=18, alpha=66)
     _draw_glossy_panel(img, banner_frame, 22, (16, 23, 28, 255), (8, 12, 16, 255), outline=(36, 48, 56), inner_outline=(255, 255, 255, 8), gloss_alpha=12)
-    banner_inner = (banner_frame[0] + 10, banner_frame[1] + 10, banner_frame[2] - 10, banner_frame[3] - 10)
+    banner_inner = (banner_frame[0] + 12, banner_frame[1] + 12, banner_frame[2] - 12, banner_frame[3] - 12)
     if market_type == "moneyline":
         if play_count == 1:
             banner_source = MONEYLINE_BANNER_PATH if MONEYLINE_BANNER_PATH.exists() else (MONEYLINES_BANNER_PATH if MONEYLINES_BANNER_PATH.exists() else BANNER_PATH)
