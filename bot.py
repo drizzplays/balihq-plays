@@ -376,7 +376,7 @@ def _draw_league_chip(img: Image.Image, draw: ImageDraw.ImageDraw, box, league: 
         _draw_glossy_panel(img, icon_wrap, 10, (30, 40, 46, 255), (14, 19, 24, 255), outline=(66, 82, 90), inner_outline=(255, 255, 255, 10), gloss_alpha=24)
         icon_box = (icon_wrap[0] + 4, icon_wrap[1] + 4, icon_wrap[2] - 4, icon_wrap[3] - 4)
         _paste_contain(img, icon_path, icon_box)
-        text_x = icon_wrap[2] + 14
+        text_x = icon_wrap[2] + 12
         text_max_width = box[2] - text_x - 18
 
     league_text, league_font = _fit_text(draw, str(league).upper(), text_max_width, 25, True, 19)
@@ -816,15 +816,17 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     ROW_GAP = 20
     LEFT_GUTTER = INNER_PAD
     RIGHT_GUTTER = INNER_PAD
-    ICON_COL_W = 86
-    TEXT_COL_GAP = 37
+
+    # Lower-card design tokens.
+    # These replace the old per-element nudge behavior. The lower panel is now
+    # built from shared rails + a vertical flow so each module stays locked.
     BADGE_H = 56
-    PLAY_ROW_H = 122
-    MODULE_GAP = 24
-    CONTENT_ROW_GAP = MODULE_GAP - 14  # targeted fix: tighten TT row -> official play row by 6px
-    BANNER_TOP_GAP = MODULE_GAP - 14  # exact correction: move banner down by 4px
-    BOARD_TOP_GUTTER = INNER_PAD - 7
-    BOARD_BOTTOM_GUTTER = MODULE_GAP
+    PLAY_ROW_H = 116
+    MODULE_GAP = 16
+    CONTENT_ROW_GAP = MODULE_GAP
+    BANNER_TOP_GAP = MODULE_GAP
+    BOARD_TOP_GUTTER = 26
+    BOARD_BOTTOM_GUTTER = 24
 
     green = (132, 255, 55)
     white = (246, 248, 250)
@@ -969,9 +971,9 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     if primary_unit:
         unit_text_w = _text_width(draw, primary_unit, _font(30, True))
         unit_chip_w = max(282, unit_text_w + 110)
-        unit_chip = (content_right - unit_chip_w - 7, top_y, content_right - 7, top_y + chip_h)
+        unit_chip = (content_right - unit_chip_w, top_y, content_right, top_y + chip_h)
         _draw_glossy_panel(img, unit_chip, 16, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 10), gloss_alpha=18)
-        _draw_text_vcenter(draw, unit_chip, primary_unit, _font(30, True), green, x=unit_chip[0] + ((unit_chip[2] - unit_chip[0]) - unit_text_w) / 2, y_offset=-1)
+        _draw_text_vcenter(draw, unit_chip, primary_unit, _font(30, True), green, x=unit_chip[0] + ((unit_chip[2] - unit_chip[0]) - unit_text_w) / 2, y_offset=-2)
 
     section_y = top_y + chip_h + 16
     if market_type == "moneyline":
@@ -998,9 +1000,11 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
         if single_moneyline_layout:
             # Fixed icon column + fixed text column. The icon, label, and pick
-            # are one vertically centered group, not three separately nudged objects.
+            # are one grouped composition. Do not place these from unrelated
+            # coordinates; text_x derives from the check box.
             check_size = 54
             inner_left_pad = 20
+            icon_text_gap = 24
             icon_x = row_box[0] + inner_left_pad
             icon_y = int(row_box[1] + ((row_box[3] - row_box[1]) - check_size) / 2)
             check_wrap = (icon_x, icon_y, icon_x + check_size, icon_y + check_size)
@@ -1009,16 +1013,16 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             draw.line((check_wrap[0] + 15, check_wrap[1] + 29, check_wrap[0] + 24, check_wrap[1] + 38), fill=green_check, width=6)
             draw.line((check_wrap[0] + 23, check_wrap[1] + 38, check_wrap[0] + 38, check_wrap[1] + 18), fill=green_check, width=6)
 
-            content_x = row_box[0] + ICON_COL_W + TEXT_COL_GAP - 7
+            content_x = icon_x + check_size + icon_text_gap
             content_w = row_box[2] - content_x - RIGHT_GUTTER
             sub_label = "OFFICIAL PLAY"
             label_font = _font(15, True)
             big_bet, big_font = _fit_text(draw, bet_text, content_w, 47, True, 38)
             text_gap = 9
             text_group_h = _text_height(draw, sub_label, label_font) + text_gap + _text_height(draw, big_bet, big_font)
-            text_group_y = int(row_box[1] + ((row_box[3] - row_box[1]) - text_group_h) / 2) - 7
+            text_group_y = int(row_box[1] + ((row_box[3] - row_box[1]) - text_group_h) / 2) - 3
             draw.text((content_x, text_group_y), sub_label, font=label_font, fill=off_white)
-            pick_y = text_group_y + _text_height(draw, sub_label, label_font) + text_gap - 3
+            pick_y = text_group_y + _text_height(draw, sub_label, label_font) + text_gap - 4
             draw.text((content_x, pick_y), big_bet, font=big_font, fill=white)
         else:
             num_chip = (row_box[0] + 18, row_box[1] + 21, row_box[0] + 60, row_box[1] + 63)
