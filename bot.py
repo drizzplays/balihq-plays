@@ -822,7 +822,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     PLAY_ROW_H = 122
     MODULE_GAP = 24
     CONTENT_ROW_GAP = MODULE_GAP - 8  # micro-fix: tighten badge row -> official play gap only
-    BANNER_TOP_GAP = MODULE_GAP - 8   # micro-fix: tighten official play -> banner gap only
+    BANNER_TOP_GAP = MODULE_GAP - 12  # final micro-fix: reduce official play -> banner gap by 4px
     BOARD_TOP_GUTTER = INNER_PAD
     BOARD_BOTTOM_GUTTER = MODULE_GAP
 
@@ -1009,14 +1009,14 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             draw.line((check_wrap[0] + 15, check_wrap[1] + 29, check_wrap[0] + 24, check_wrap[1] + 38), fill=green_check, width=6)
             draw.line((check_wrap[0] + 23, check_wrap[1] + 38, check_wrap[0] + 38, check_wrap[1] + 18), fill=green_check, width=6)
 
-            content_x = row_box[0] + ICON_COL_W + TEXT_COL_GAP
+            content_x = row_box[0] + ICON_COL_W + TEXT_COL_GAP + 4
             content_w = row_box[2] - content_x - RIGHT_GUTTER
             sub_label = "OFFICIAL PLAY"
             label_font = _font(15, True)
             big_bet, big_font = _fit_text(draw, bet_text, content_w, 47, True, 38)
             text_gap = 9
             text_group_h = _text_height(draw, sub_label, label_font) + text_gap + _text_height(draw, big_bet, big_font)
-            text_group_y = int(row_box[1] + ((row_box[3] - row_box[1]) - text_group_h) / 2) - 8
+            text_group_y = int(row_box[1] + ((row_box[3] - row_box[1]) - text_group_h) / 2) - 6
             draw.text((content_x, text_group_y), sub_label, font=label_font, fill=off_white)
             pick_y = text_group_y + _text_height(draw, sub_label, label_font) + text_gap - 3
             draw.text((content_x, pick_y), big_bet, font=big_font, fill=white)
