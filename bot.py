@@ -817,13 +817,14 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     LEFT_GUTTER = INNER_PAD
     RIGHT_GUTTER = INNER_PAD
     ICON_COL_W = 86
-    TEXT_COL_GAP = 36
+    TEXT_COL_GAP = 44
     BADGE_H = 56
     PLAY_ROW_H = 122
-    CONTENT_ROW_GAP = 36
-    BANNER_TOP_GAP = CONTENT_ROW_GAP
+    MODULE_GAP = 24
+    CONTENT_ROW_GAP = MODULE_GAP
+    BANNER_TOP_GAP = MODULE_GAP
     BOARD_TOP_GUTTER = INNER_PAD
-    BOARD_BOTTOM_GUTTER = INNER_PAD
+    BOARD_BOTTOM_GUTTER = MODULE_GAP
 
     green = (132, 255, 55)
     white = (246, 248, 250)
@@ -911,7 +912,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     _draw_drop_shadow(img, hero, radius=24, offset=(0, 10), blur=20, alpha=78)
     _draw_glossy_panel(img, hero, 24, (13, 19, 23, 255), (6, 10, 13, 255), outline=(42, 56, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
 
-    time_pill_w = 256
+    time_pill_w = 236
     time_pill = (hero[0] + LEFT_GUTTER, hero[1] + 22, hero[0] + LEFT_GUTTER + time_pill_w, hero[3] - 22)
     _draw_glossy_panel(img, time_pill, 18, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 10), gloss_alpha=20)
     clock_size = 46
@@ -926,7 +927,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     draw.text((time_x, time_group_y), time_text, font=time_font, fill=white)
     draw.text((time_x, time_group_y + _text_height(draw, time_text, time_font) + 5), "EST", font=est_font, fill=green)
 
-    divider_x = time_pill[2] + 24
+    divider_x = time_pill[2] + 18
     draw.line((divider_x, time_pill[1] + 6, divider_x, time_pill[3] - 6), fill=(48, 60, 68), width=2)
 
     matchup = f"{player_1} vs {player_2}"
@@ -949,6 +950,10 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
     # board
     board = (panel_x1, board_y, panel_x2, board_bottom)
+    # Shared lower-panel rails. TT badge, official play, banner, and unit badge
+    # all snap to these instead of using local offsets.
+    content_left = board[0] + LEFT_GUTTER
+    content_right = board[2] - RIGHT_GUTTER
     _draw_drop_shadow(img, board, radius=28, offset=(0, 14), blur=24, alpha=84)
     _draw_glossy_panel(img, board, 28, (18, 25, 30, 255), (8, 12, 16, 255), outline=(40, 53, 60), inner_outline=(255, 255, 255, 8), gloss_alpha=12)
 
@@ -958,13 +963,13 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     league_icon = _league_icon_path(league)
     league_text_w = _text_width(draw, league_text, league_font)
     league_chip_w = max(350, league_text_w + (106 if league_icon else 74))
-    league_chip = (board[0] + LEFT_GUTTER, top_y, board[0] + LEFT_GUTTER + league_chip_w, top_y + chip_h)
+    league_chip = (content_left, top_y, content_left + league_chip_w, top_y + chip_h)
     _draw_league_chip(img, draw, league_chip, league, text_color=white)
 
     if primary_unit:
         unit_text_w = _text_width(draw, primary_unit, _font(30, True))
         unit_chip_w = max(282, unit_text_w + 110)
-        unit_chip = (board[2] - RIGHT_GUTTER - unit_chip_w, top_y, board[2] - RIGHT_GUTTER, top_y + chip_h)
+        unit_chip = (content_right - unit_chip_w, top_y, content_right, top_y + chip_h)
         _draw_glossy_panel(img, unit_chip, 16, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 10), gloss_alpha=18)
         _draw_text_vcenter(draw, unit_chip, primary_unit, _font(30, True), green, x=unit_chip[0] + ((unit_chip[2] - unit_chip[0]) - unit_text_w) / 2)
 
@@ -976,13 +981,13 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     else:
         section = "OFFICIAL PLAYS"
     if section:
-        draw.text((board[0] + LEFT_GUTTER, section_y), section, font=_font(18, True), fill=(205, 211, 216))
+        draw.text((content_left, section_y), section, font=_font(18, True), fill=(205, 211, 216))
         if play_count > 1:
-            draw.text((board[0] + LEFT_GUTTER + _text_width(draw, section, _font(18, True)) + 14, section_y + 4), f"• {play_count} PLAYS", font=_font(14, True), fill=muted)
-        draw.line((board[0] + LEFT_GUTTER, section_y + 28, board[2] - RIGHT_GUTTER, section_y + 28), fill=(21, 30, 37), width=1)
+            draw.text((content_left + _text_width(draw, section, _font(18, True)) + 14, section_y + 4), f"• {play_count} PLAYS", font=_font(14, True), fill=muted)
+        draw.line((content_left, section_y + 28, content_right, section_y + 28), fill=(21, 30, 37), width=1)
 
-    row_x1 = board[0] + LEFT_GUTTER
-    row_x2 = board[2] - RIGHT_GUTTER
+    row_x1 = content_left
+    row_x2 = content_right
     current_y = rows_top
     for idx, play in enumerate(plays, start=1):
         row_box = (row_x1, current_y, row_x2, current_y + row_h)
@@ -995,7 +1000,8 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             # Fixed icon column + fixed text column. The icon, label, and pick
             # are one vertically centered group, not three separately nudged objects.
             check_size = 54
-            icon_x = row_box[0] + 18
+            inner_left_pad = 16
+            icon_x = row_box[0] + inner_left_pad
             icon_y = int(row_box[1] + ((row_box[3] - row_box[1]) - check_size) / 2)
             check_wrap = (icon_x, icon_y, icon_x + check_size, icon_y + check_size)
             _draw_glossy_panel(img, check_wrap, 15, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=10)
@@ -1010,7 +1016,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             big_bet, big_font = _fit_text(draw, bet_text, content_w, 47, True, 38)
             text_gap = 9
             text_group_h = _text_height(draw, sub_label, label_font) + text_gap + _text_height(draw, big_bet, big_font)
-            text_group_y = int(row_box[1] + ((row_box[3] - row_box[1]) - text_group_h) / 2) - 6
+            text_group_y = int(row_box[1] + ((row_box[3] - row_box[1]) - text_group_h) / 2) - 8
             draw.text((content_x, text_group_y), sub_label, font=label_font, fill=off_white)
             pick_y = text_group_y + _text_height(draw, sub_label, label_font) + text_gap - 3
             draw.text((content_x, pick_y), big_bet, font=big_font, fill=white)
