@@ -344,6 +344,10 @@ def _league_icon_path(league: str) -> Path | None:
     candidates = []
     if "elite" in normalized:
         candidates.append(IMAGES_DIR / "tt_elite.png")
+    if "cup" in normalized:
+        candidates.append(IMAGES_DIR / "tt_cup.png")
+    if "setka" in normalized:
+        candidates.append(IMAGES_DIR / "tt_setka.png")
 
     slug = _slugify_league_name(league_text)
     if slug:
@@ -934,20 +938,28 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     _draw_drop_shadow(img, hero, radius=24, offset=(0, 10), blur=20, alpha=78)
     _draw_glossy_panel(img, hero, 24, (13, 19, 23, 255), (6, 10, 13, 255), outline=(42, 56, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
 
-    time_pill_w = 230
+    time_pill_w = 254
     time_pill = (hero[0] + LEFT_GUTTER, hero[1] + 22, hero[0] + LEFT_GUTTER + time_pill_w, hero[3] - 22)
     _draw_glossy_panel(img, time_pill, 18, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 10), gloss_alpha=20)
     clock_size = 46
     clock_y = int(time_pill[1] + ((time_pill[3] - time_pill[1]) - clock_size) / 2)
     _draw_clock(draw, time_pill[0] + 18, clock_y)
     clean_est = str(est).upper().replace("EST", "").replace("EDT", "").strip() or est
-    time_text, time_font = _fit_text(draw, clean_est, 160, 30, True, 24)
-    est_font = _font(16, True)
-    time_group_h = _text_height(draw, time_text, time_font) + 5 + _text_height(draw, "EST", est_font)
-    time_group_y = int(time_pill[1] + ((time_pill[3] - time_pill[1]) - time_group_h) / 2) - 1
-    time_x = time_pill[0] + 92
-    draw.text((time_x, time_group_y), time_text, font=time_font, fill=white)
-    draw.text((time_x, time_group_y + _text_height(draw, time_text, time_font) + 5), "EST", font=est_font, fill=green)
+    time_text, time_font = _fit_text(draw, clean_est, 120, 30, True, 24)
+    est_text = "EST"
+    est_font = _font(18, True)
+    time_gap = 10
+    time_w = _text_width(draw, time_text, time_font)
+    est_w = _text_width(draw, est_text, est_font)
+    line_h = max(_text_height(draw, time_text, time_font), _text_height(draw, est_text, est_font))
+    text_left = time_pill[0] + 84
+    text_area_w = time_pill[2] - text_left - 16
+    group_w = time_w + time_gap + est_w
+    group_x = text_left + max(0, (text_area_w - group_w) / 2)
+    line_y = int(time_pill[1] + ((time_pill[3] - time_pill[1]) - line_h) / 2) - 1
+    draw.text((group_x, line_y), time_text, font=time_font, fill=white)
+    est_y = line_y + max(0, (_text_height(draw, time_text, time_font) - _text_height(draw, est_text, est_font)) / 2) + 1
+    draw.text((group_x + time_w + time_gap, est_y), est_text, font=est_font, fill=green)
 
     divider_x = time_pill[2] + 16
     draw.line((divider_x, time_pill[1] + 6, divider_x, time_pill[3] - 6), fill=(48, 60, 68), width=2)
@@ -1048,13 +1060,13 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             sub_label = "OFFICIAL PLAY"
             label_font = _font(15, True)
             title_text = _moneyline_name_display(bet_text)
-            pill_font = _font(16, True)
+            pill_font = _font(40, True)
             pill_text = "MONEYLINE"
             pill_text_w = _text_width(draw, pill_text, pill_font)
-            pill_pad_x = 16
-            pill_h = 30
+            pill_pad_x = 20
+            pill_h = 54
             pill_w = pill_text_w + pill_pad_x * 2
-            title_gap = 16
+            title_gap = 18
 
             row_right_pad = 20
             odds_text = _odds_display(play.get("odds", "") or primary_odds)
@@ -1062,10 +1074,10 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             odds_chip_gap = 20
             reserved_right = row_box[2] - row_right_pad
             if odds_text:
-                odds_font = _font(30, True)
+                odds_font = _font(32, True)
                 odds_text_w = _text_width(draw, odds_text, odds_font)
                 odds_chip_w = max(220, odds_text_w + 96)
-                odds_chip_h = 48
+                odds_chip_h = 54
                 odds_y = int(row_box[1] + ((row_box[3] - row_box[1]) - odds_chip_h) / 2)
                 odds_chip = (reserved_right - odds_chip_w, odds_y, reserved_right, odds_y + odds_chip_h)
                 reserved_right = odds_chip[0] - odds_chip_gap
@@ -1083,12 +1095,12 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             title_w = _text_width(draw, big_bet, big_font)
             pill_y = int(pick_y + max(0, (title_h - pill_h) / 2) + 1)
             market_chip = (content_x + title_w + title_gap, pill_y, content_x + title_w + title_gap + pill_w, pill_y + pill_h)
-            _draw_glossy_panel(img, market_chip, 12, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
+            _draw_glossy_panel(img, market_chip, 18, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
             _draw_text_vcenter(draw, market_chip, pill_text, pill_font, green, x=market_chip[0] + pill_pad_x, y_offset=-1)
 
             if odds_chip:
                 _draw_glossy_panel(img, odds_chip, 16, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 10), gloss_alpha=18)
-                odds_font = _font(30, True)
+                odds_font = _font(32, True)
                 odds_text_w = _text_width(draw, odds_text, odds_font)
                 _draw_text_vcenter(draw, odds_chip, odds_text, odds_font, white, x=odds_chip[0] + ((odds_chip[2] - odds_chip[0]) - odds_text_w) / 2, y_offset=-1)
         else:
