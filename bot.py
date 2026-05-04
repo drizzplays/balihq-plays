@@ -771,6 +771,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         play["market_type"] = market_type
     play_count = len(plays)
     primary_unit = _unit_display(plays[0].get("unit", "") or _get_value(row, "Unit", "Units", "Stake", fallback=""))
+    single_moneyline_layout = market_type == "moneyline" and play_count == 1
 
     width = 1200
     outer_pad = 26
@@ -785,8 +786,8 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     header_h = 84
     hero_h = 104
     chip_h = 40
-    row_h = 84
-    row_gap = 12
+    row_h = 112 if single_moneyline_layout else 84
+    row_gap = 0 if single_moneyline_layout else 12
     rows_h = play_count * row_h + max(0, play_count - 1) * row_gap
     banner_h = 358
 
@@ -898,7 +899,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
     section_y = board_y + 70
     if market_type == "moneyline":
-        section = "MONEYLINE" if play_count == 1 else "MONEYLINES"
+        section = "FEATURED MONEYLINE" if play_count == 1 else "MONEYLINES"
     elif market_type == "live":
         section = "LIVE PLAYS"
     else:
@@ -917,49 +918,79 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         _draw_glossy_panel(img, row_box, 18, (16, 23, 28, 255), (8, 12, 16, 255), outline=(34, 45, 53), inner_outline=(255, 255, 255, 7), gloss_alpha=10)
         draw.rounded_rectangle((row_box[0] + 10, row_box[1] + 12, row_box[0] + 14, row_box[3] - 12), radius=3, fill=green)
 
-        num_chip = (row_box[0] + 18, row_box[1] + 21, row_box[0] + 60, row_box[1] + 63)
-        _draw_glossy_panel(img, num_chip, 14, (24, 37, 27, 255), (11, 18, 14, 255), outline=(64, 98, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
-        n_txt = str(idx)
-        n_w = _text_width(draw, n_txt, _font(20, True))
-        _draw_text_vcenter(draw, num_chip, n_txt, _font(20, True), green, x=num_chip[0] + ((num_chip[2] - num_chip[0]) - n_w) / 2)
-
-        check_x = num_chip[2] + 18
-        _draw_check(draw, check_x, row_box[1] + 18)
-
-        main_x = check_x + 56
-        max_main_w = row_box[2] - main_x - 42
         bet_text = str(play.get("bet", "") or "No Bet Found").strip()
         history_text = str(play.get("history", "") or "").strip()
 
-        if history_text and market_type != "moneyline":
-            record = f"{history_text} L20"
-            record_font = _font(20, True)
-            bullet_font = _font(20, True)
-            record_w = _text_width(draw, record, record_font)
-            bullet_w = _text_width(draw, "  •  ", bullet_font)
-            bet_fit, bet_font = _fit_text(draw, bet_text, max_main_w - record_w - bullet_w, 24, True, 16)
-            draw.text((main_x, row_box[1] + 15), bet_fit, font=bet_font, fill=white)
-            bet_w = _text_width(draw, bet_fit, bet_font)
-            draw.text((main_x + bet_w, row_box[1] + 15), "  •  ", font=bullet_font, fill=off_white)
-            draw.text((main_x + bet_w + bullet_w, row_box[1] + 15), record, font=record_font, fill=white)
+        if single_moneyline_layout:
+            # redesigned featured single-moneyline block
+            badge_font = _font(13, True)
+            label = "FEATURED PICK"
+            label_w = _text_width(draw, label, badge_font)
+            label_chip = (row_box[0] + 24, row_box[1] + 14, row_box[0] + 24 + label_w + 22, row_box[1] + 40)
+            _draw_glossy_panel(img, label_chip, 12, (24, 37, 27, 255), (11, 18, 14, 255), outline=(64, 98, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
+            _draw_text_vcenter(draw, label_chip, label, badge_font, green, x=label_chip[0] + 11)
+
+            unit_value = _unit_display(play.get("unit", "")) or primary_unit
+            if unit_value:
+                unit_w = _text_width(draw, unit_value, _font(16, True))
+                unit_chip = (row_box[2] - 24 - max(110, unit_w + 26), row_box[1] + 14, row_box[2] - 24, row_box[1] + 40)
+                _draw_glossy_panel(img, unit_chip, 12, (24, 37, 27, 255), (11, 18, 14, 255), outline=(64, 98, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
+                _draw_text_vcenter(draw, unit_chip, unit_value, _font(16, True), green, x=unit_chip[0] + ((unit_chip[2]-unit_chip[0]) - unit_w)/2)
+
+            check_x = row_box[0] + 32
+            check_y = row_box[1] + 50
+            _draw_check(draw, check_x, check_y)
+
+            title_x = check_x + 66
+            title_y = row_box[1] + 48
+            big_bet, big_font = _fit_text(draw, bet_text, row_box[2] - title_x - 36, 34, True, 24)
+            draw.text((title_x, title_y), big_bet, font=big_font, fill=white)
+
+            sub_label = "OFFICIAL MONEYLINE PLAY"
+            draw.text((title_x, row_box[1] + 82), sub_label, font=_font(14, True), fill=off_white)
+            draw.rounded_rectangle((row_box[2] - 12, row_box[1] + 18, row_box[2] - 8, row_box[3] - 18), radius=3, fill=green)
         else:
-            bet_fit, bet_font = _fit_text(draw, bet_text, max_main_w, 24, True, 16)
-            draw.text((main_x, row_box[1] + 15), bet_fit, font=bet_font, fill=white)
+            num_chip = (row_box[0] + 18, row_box[1] + 21, row_box[0] + 60, row_box[1] + 63)
+            _draw_glossy_panel(img, num_chip, 14, (24, 37, 27, 255), (11, 18, 14, 255), outline=(64, 98, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
+            n_txt = str(idx)
+            n_w = _text_width(draw, n_txt, _font(20, True))
+            _draw_text_vcenter(draw, num_chip, n_txt, _font(20, True), green, x=num_chip[0] + ((num_chip[2] - num_chip[0]) - n_w) / 2)
 
-        meta_parts = []
-        scenario = str(play.get("scenario", "") or "").strip()
-        if scenario:
-            meta_parts.append(f"If {scenario}" if not scenario.lower().startswith("if ") else scenario)
-        if play.get("unit"):
-            meta_parts.append(_unit_display(play.get("unit", "")))
-        if history_text and market_type == "totals":
-            meta_parts.append("History " + history_text)
-        if meta_parts:
-            meta_line = "   •   ".join(meta_parts)
-            meta_fit, meta_font = _fit_text(draw, meta_line, max_main_w, 14, False, 11)
-            draw.text((main_x, row_box[1] + 46), meta_fit, font=meta_font, fill=off_white)
+            check_x = num_chip[2] + 18
+            _draw_check(draw, check_x, row_box[1] + 18)
 
-        draw.rounded_rectangle((row_box[2] - 12, row_box[1] + 14, row_box[2] - 8, row_box[3] - 14), radius=3, fill=green)
+            main_x = check_x + 56
+            max_main_w = row_box[2] - main_x - 42
+
+            if history_text and market_type != "moneyline":
+                record = f"{history_text} L20"
+                record_font = _font(20, True)
+                bullet_font = _font(20, True)
+                record_w = _text_width(draw, record, record_font)
+                bullet_w = _text_width(draw, "  •  ", bullet_font)
+                bet_fit, bet_font = _fit_text(draw, bet_text, max_main_w - record_w - bullet_w, 24, True, 16)
+                draw.text((main_x, row_box[1] + 15), bet_fit, font=bet_font, fill=white)
+                bet_w = _text_width(draw, bet_fit, bet_font)
+                draw.text((main_x + bet_w, row_box[1] + 15), "  •  ", font=bullet_font, fill=off_white)
+                draw.text((main_x + bet_w + bullet_w, row_box[1] + 15), record, font=record_font, fill=white)
+            else:
+                bet_fit, bet_font = _fit_text(draw, bet_text, max_main_w, 24, True, 16)
+                draw.text((main_x, row_box[1] + 15), bet_fit, font=bet_font, fill=white)
+
+            meta_parts = []
+            scenario = str(play.get("scenario", "") or "").strip()
+            if scenario:
+                meta_parts.append(f"If {scenario}" if not scenario.lower().startswith("if ") else scenario)
+            if play.get("unit"):
+                meta_parts.append(_unit_display(play.get("unit", "")))
+            if history_text and market_type == "totals":
+                meta_parts.append("History " + history_text)
+            if meta_parts:
+                meta_line = "   •   ".join(meta_parts)
+                meta_fit, meta_font = _fit_text(draw, meta_line, max_main_w, 14, False, 11)
+                draw.text((main_x, row_box[1] + 46), meta_fit, font=meta_font, fill=off_white)
+
+            draw.rounded_rectangle((row_box[2] - 12, row_box[1] + 14, row_box[2] - 8, row_box[3] - 14), radius=3, fill=green)
         current_y += row_h + row_gap
 
     banner_frame = (board[0] + 20, banner_y, board[2] - 20, banner_y + banner_h)
