@@ -786,7 +786,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     header_h = 84
     hero_h = 104
     chip_h = 40
-    row_h = 102 if single_moneyline_layout else 84
+    row_h = 92 if single_moneyline_layout else 84
     row_gap = 0 if single_moneyline_layout else 12
     rows_h = play_count * row_h + max(0, play_count - 1) * row_gap
     banner_h = 358
@@ -850,11 +850,11 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     _draw_drop_shadow(img, hero, radius=24, offset=(0, 10), blur=20, alpha=78)
     _draw_glossy_panel(img, hero, 24, (13, 19, 23, 255), (6, 10, 13, 255), outline=(80, 132, 82), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
 
-    time_pill = (hero[0] + 18, hero[1] + 19, hero[0] + 226, hero[1] + 71)
+    time_pill = (hero[0] + 18, hero[1] + 18, hero[0] + 252, hero[1] + 72)
     _draw_glossy_panel(img, time_pill, 18, (24, 37, 27, 255), (10, 18, 13, 255), outline=(76, 118, 74), inner_outline=(255, 255, 255, 10), gloss_alpha=20)
     _draw_clock(draw, time_pill[0] + 14, time_pill[1] + 3)
     clean_est = str(est).upper().replace("EST", "").replace("EDT", "").strip() or est
-    time_text, time_font = _fit_text(draw, clean_est, 124, 22, True, 16)
+    time_text, time_font = _fit_text(draw, clean_est, 148, 24, True, 18)
     draw.text((time_pill[0] + 72, time_pill[1] + 3), time_text, font=time_font, fill=white)
     draw.text((time_pill[0] + 72, time_pill[1] + 28), "EST", font=_font(14, True), fill=green)
 
@@ -899,7 +899,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
     section_y = board_y + 70
     if market_type == "moneyline":
-        section = "FEATURED MONEYLINE" if play_count == 1 else "MONEYLINES"
+        section = "MONEYLINE" if play_count == 1 else "MONEYLINES"
     elif market_type == "live":
         section = "LIVE PLAYS"
     else:
@@ -916,33 +916,22 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         row_box = (row_x1, current_y, row_x2, current_y + row_h)
         _draw_drop_shadow(img, row_box, radius=18, offset=(0, 8), blur=16, alpha=54)
         _draw_glossy_panel(img, row_box, 18, (16, 23, 28, 255), (8, 12, 16, 255), outline=(34, 45, 53), inner_outline=(255, 255, 255, 7), gloss_alpha=10)
-        draw.rounded_rectangle((row_box[0] + 10, row_box[1] + 12, row_box[0] + 14, row_box[3] - 12), radius=3, fill=green)
-
         bet_text = str(play.get("bet", "") or "No Bet Found").strip()
         history_text = str(play.get("history", "") or "").strip()
 
         if single_moneyline_layout:
-            # simplified high-end single-moneyline module
-            check_wrap = (row_box[0] + 22, row_box[1] + 26, row_box[0] + 72, row_box[1] + 76)
+            # simplified premium single-moneyline row
+            check_wrap = (row_box[0] + 20, row_box[1] + 21, row_box[0] + 70, row_box[1] + 71)
             _draw_glossy_panel(img, check_wrap, 15, (23, 37, 27, 255), (11, 18, 14, 255), outline=(64, 98, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
             _draw_check(draw, check_wrap[0] + 8, check_wrap[1] + 7)
 
             content_x = check_wrap[2] + 18
-            content_w = row_box[2] - content_x - 34
-            badge_font = _font(13, True)
-            label = "FEATURED PICK"
-            label_w = _text_width(draw, label, badge_font)
-            label_chip = (content_x, row_box[1] + 16, content_x + label_w + 22, row_box[1] + 42)
-            _draw_glossy_panel(img, label_chip, 12, (24, 37, 27, 255), (11, 18, 14, 255), outline=(64, 98, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
-            _draw_text_vcenter(draw, label_chip, label, badge_font, green, x=label_chip[0] + 11)
-
-            big_bet, big_font = _fit_text(draw, bet_text, content_w, 38, True, 28)
-            draw.text((content_x, row_box[1] + 46), big_bet, font=big_font, fill=white)
-
+            content_w = row_box[2] - content_x - 24
             sub_label = "OFFICIAL MONEYLINE PLAY"
-            draw.text((content_x, row_box[1] + 78), sub_label, font=_font(13, True), fill=off_white)
+            draw.text((content_x, row_box[1] + 18), sub_label, font=_font(13, True), fill=off_white)
 
-            draw.rounded_rectangle((row_box[2] - 12, row_box[1] + 16, row_box[2] - 8, row_box[3] - 16), radius=3, fill=green)
+            big_bet, big_font = _fit_text(draw, bet_text, content_w, 40, True, 30)
+            draw.text((content_x, row_box[1] + 40), big_bet, font=big_font, fill=white)
         else:
             num_chip = (row_box[0] + 18, row_box[1] + 21, row_box[0] + 60, row_box[1] + 63)
             _draw_glossy_panel(img, num_chip, 14, (24, 37, 27, 255), (11, 18, 14, 255), outline=(64, 98, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
@@ -984,7 +973,6 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
                 meta_fit, meta_font = _fit_text(draw, meta_line, max_main_w, 14, False, 11)
                 draw.text((main_x, row_box[1] + 46), meta_fit, font=meta_font, fill=off_white)
 
-            draw.rounded_rectangle((row_box[2] - 12, row_box[1] + 14, row_box[2] - 8, row_box[3] - 14), radius=3, fill=green)
         current_y += row_h + row_gap
 
     banner_frame = (board[0] + 20, banner_y, board[2] - 20, banner_y + banner_h)
