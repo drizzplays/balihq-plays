@@ -23,6 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent
 IMAGES_DIR = BASE_DIR / "images"
 AVATAR_PATH = IMAGES_DIR / "avatar.png"
 BANNER_PATH = IMAGES_DIR / "banner.png"
+MONEYLINES_BANNER_PATH = IMAGES_DIR / "moneylines.png"
 GENERATED_CARD_PATH = BASE_DIR / f"generated_bali_pick_{int(time.time())}.png"
 
 BRAND_NAME = "BALIHQBETS"
@@ -579,10 +580,21 @@ def _format_unit(unit: str) -> str:
 
 def _draw_market_banner(img: Image.Image, banner_frame: tuple[int, int, int, int], market_type: str):
     draw = ImageDraw.Draw(img)
+
+    # Moneylines banner should come from the images folder, not the generated fallback art.
+    if market_type == "moneyline" and MONEYLINES_BANNER_PATH.exists():
+        _rounded_rect(draw, banner_frame, 22, fill=(11, 17, 20), outline=(55, 73, 80), width=1)
+        _add_panel_gloss(img, banner_frame, radius=22, top_alpha=18, bottom_alpha=16)
+        _paste_cover(
+            img,
+            MONEYLINES_BANNER_PATH,
+            (banner_frame[0] + 10, banner_frame[1] + 10, banner_frame[2] - 10, banner_frame[3] - 10),
+            radius=18,
+        )
+        return
+
     green = (124, 255, 0)
-    white = (246, 247, 248)
     dark = (7, 13, 15)
-    muted = (26, 43, 45)
 
     _rounded_rect(draw, banner_frame, 22, fill=(11, 17, 20), outline=(55, 73, 80), width=1)
     _add_panel_gloss(img, banner_frame, radius=22, top_alpha=18, bottom_alpha=16)
@@ -590,7 +602,6 @@ def _draw_market_banner(img: Image.Image, banner_frame: tuple[int, int, int, int
     _draw_soft_glow(img, inner, radius=18, color=(0, 150, 60, 35), border=3)
     _rounded_rect(draw, inner, 18, fill=(238, 242, 239), outline=(35, 55, 58), width=1)
 
-    # Side panels keep the card sports-betting themed without hardcoding the old TOTALS art.
     left_panel = (inner[0], inner[1], inner[0] + 230, inner[3])
     right_panel = (inner[2] - 230, inner[1], inner[2], inner[3])
     draw.rectangle(left_panel, fill=(8, 20, 15))
@@ -600,7 +611,6 @@ def _draw_market_banner(img: Image.Image, banner_frame: tuple[int, int, int, int
         draw.line((inner[0] + offset, inner[3], inner[0] + offset + 130, inner[1]), fill=(0, 90, 34), width=4)
         draw.line((inner[2] - offset, inner[3], inner[2] - offset - 130, inner[1]), fill=(0, 90, 34), width=4)
 
-    # Center title block.
     center_x1 = inner[0] + 210
     center_x2 = inner[2] - 210
     shadow = Image.new("RGBA", img.size, (0, 0, 0, 0))
@@ -611,10 +621,7 @@ def _draw_market_banner(img: Image.Image, banner_frame: tuple[int, int, int, int
     draw.rectangle((center_x1, inner[1], center_x2, inner[3]), fill=(239, 243, 240))
 
     title = "BALI BETS"
-    if market_type == "moneyline":
-        subtitle = "TABLE TENNIS MONEYLINES"
-        badge = "MONEYLINE CARD"
-    elif market_type == "live":
+    if market_type == "live":
         subtitle = "TABLE TENNIS LIVE PLAYS"
         badge = "LIVE CARD"
     else:
@@ -638,18 +645,12 @@ def _draw_market_banner(img: Image.Image, banner_frame: tuple[int, int, int, int
     badge_w = _text_width(draw, badge, badge_font)
     draw.text(((center_x1 + center_x2 - badge_w) / 2, inner[3] - 46), badge, font=badge_font, fill=(38, 51, 53))
 
-    # Simple paddle/ball shapes, drawn in code so the file does not need another asset.
     for side in ("left", "right"):
         if side == "left":
             cx, cy = inner[0] + 108, inner[1] + 155
             handle = (cx + 34, cy + 58, cx + 72, cy + 126)
             ball = (inner[0] + 86, inner[3] - 74, inner[0] + 130, inner[3] - 30)
-            if market_type == "moneyline":
-                paddle_fill = (0, 76, 38)
-            elif market_type == "live":
-                paddle_fill = (124, 255, 0)
-            else:
-                paddle_fill = (202, 18, 25)
+            paddle_fill = (124, 255, 0) if market_type == "live" else (202, 18, 25)
         else:
             cx, cy = inner[2] - 108, inner[1] + 155
             handle = (cx - 72, cy + 58, cx - 34, cy + 126)
@@ -660,7 +661,6 @@ def _draw_market_banner(img: Image.Image, banner_frame: tuple[int, int, int, int
         draw.rounded_rectangle(handle, radius=10, fill=(111, 62, 28), outline=(36, 24, 18), width=2)
         draw.ellipse(ball, fill=(235, 239, 236), outline=(175, 185, 180), width=2)
 
-    # Subtle bottom glow.
     glow = Image.new("RGBA", img.size, (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
     gd.rectangle((inner[0], inner[3] - 52, inner[2], inner[3]), fill=(0, 120, 43, 42))
