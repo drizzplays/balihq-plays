@@ -23,6 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent
 IMAGES_DIR = BASE_DIR / "images"
 AVATAR_PATH = IMAGES_DIR / "avatar.png"
 BANNER_PATH = IMAGES_DIR / "banner.png"
+MONEYLINE_BANNER_PATH = IMAGES_DIR / "moneyline.png"
 MONEYLINES_BANNER_PATH = IMAGES_DIR / "moneylines.png"
 GENERATED_CARD_PATH = BASE_DIR / f"generated_bali_pick_{int(time.time())}.png"
 
@@ -897,7 +898,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
     section_y = board_y + 70
     if market_type == "moneyline":
-        section = "MONEYLINES"
+        section = "MONEYLINE" if play_count == 1 else "MONEYLINES"
     elif market_type == "live":
         section = "LIVE PLAYS"
     else:
@@ -966,7 +967,10 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     _draw_glossy_panel(img, banner_frame, 22, (16, 23, 28, 255), (8, 12, 16, 255), outline=(36, 48, 56), inner_outline=(255, 255, 255, 8), gloss_alpha=12)
     banner_inner = (banner_frame[0] + 10, banner_frame[1] + 10, banner_frame[2] - 10, banner_frame[3] - 10)
     if market_type == "moneyline":
-        banner_source = MONEYLINES_BANNER_PATH if MONEYLINES_BANNER_PATH.exists() else BANNER_PATH
+        if play_count == 1:
+            banner_source = MONEYLINE_BANNER_PATH if MONEYLINE_BANNER_PATH.exists() else (MONEYLINES_BANNER_PATH if MONEYLINES_BANNER_PATH.exists() else BANNER_PATH)
+        else:
+            banner_source = MONEYLINES_BANNER_PATH if MONEYLINES_BANNER_PATH.exists() else (MONEYLINE_BANNER_PATH if MONEYLINE_BANNER_PATH.exists() else BANNER_PATH)
         _paste_cover(img, banner_source, banner_inner, radius=18)
     elif market_type == "live":
         _draw_market_banner(img, banner_frame, market_type)
