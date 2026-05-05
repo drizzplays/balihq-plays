@@ -984,7 +984,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     group_x = text_left + max(0, (text_area_w - group_w) / 2)
     center_y = (time_pill[1] + time_pill[3]) / 2
     time_y = int(center_y - time_h / 2)
-    est_y = int(center_y - est_h / 2)
+    est_y = int(center_y - est_h / 2) + 1
     draw.text((group_x, time_y), time_text, font=time_font, fill=white)
     draw.text((group_x + time_w + time_gap, est_y), est_text, font=est_font, fill=green)
 
@@ -1044,7 +1044,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         unit_right = odds_chip[0] - pill_gap if odds_chip else content_right
         unit_chip = (unit_right - unit_chip_w, top_y, unit_right, top_y + chip_h)
         _draw_glossy_panel(img, unit_chip, 16, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 10), gloss_alpha=18)
-        _draw_text_centered(draw, unit_chip, primary_unit, unit_font, green)
+        _draw_text_centered(draw, unit_chip, primary_unit, unit_font, green, y_offset=1)
 
     section_y = top_y + chip_h + 16
     if market_type == "moneyline":
@@ -1076,7 +1076,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             inner_left_pad = 20
             icon_text_gap = 18
             icon_x = row_box[0] + inner_left_pad
-            icon_y = int(row_box[1] + ((row_box[3] - row_box[1]) - check_size) / 2)
+            icon_y = int(row_box[1] + ((row_box[3] - row_box[1]) - check_size) / 2) + 5
             check_wrap = (icon_x, icon_y, icon_x + check_size, icon_y + check_size)
             _draw_glossy_panel(img, check_wrap, 15, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=10)
             green_check = (132, 255, 55)
@@ -1125,13 +1125,13 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             market_chip_x1 = content_x + title_w + title_gap
             market_chip = (market_chip_x1, int(title_center_y - pill_h / 2), market_chip_x1 + pill_w, int(title_center_y - pill_h / 2) + pill_h)
             _draw_glossy_panel(img, market_chip, 18, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
-            _draw_text_centered(draw, market_chip, pill_text, pill_font, green)
+            _draw_text_centered(draw, market_chip, pill_text, pill_font, green, y_offset=-1)
 
             if odds_text:
                 odds_right = row_box[2] - row_right_pad
                 odds_chip = (odds_right - odds_chip_w, int(title_center_y - odds_chip_h / 2), odds_right, int(title_center_y - odds_chip_h / 2) + odds_chip_h)
                 _draw_glossy_panel(img, odds_chip, 16, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 10), gloss_alpha=18)
-                _draw_text_centered(draw, odds_chip, odds_text, odds_font, white)
+                _draw_text_centered(draw, odds_chip, odds_text, odds_font, white, y_offset=1)
 
         else:
             num_chip = (row_box[0] + 18, row_box[1] + 21, row_box[0] + 60, row_box[1] + 63)
