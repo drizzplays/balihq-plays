@@ -384,7 +384,8 @@ def _draw_league_chip(img: Image.Image, draw: ImageDraw.ImageDraw, box, league: 
         text_max_width = box[2] - text_x - 18
 
     league_text, league_font = _fit_text(draw, str(league).upper(), text_max_width, 25, True, 19)
-    _draw_text_vcenter(draw, box, league_text, league_font, text_color, x=text_x)
+    chip_center_y = (box[1] + box[3]) / 2
+    _draw_text_left_centered_on_y(draw, text_x, chip_center_y, league_text, league_font, text_color, y_offset=1)
 
 
 def _draw_soft_glow(base: Image.Image, box, radius: int, color=(124, 255, 0, 100), border=4):
@@ -976,17 +977,13 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     time_gap = 8
     time_w = _text_width(draw, time_text, time_font)
     est_w = _text_width(draw, est_text, est_font)
-    time_h = _text_height(draw, time_text, time_font)
-    est_h = _text_height(draw, est_text, est_font)
     text_left = time_pill[0] + 84
     text_area_w = time_pill[2] - text_left - 16
     group_w = time_w + time_gap + est_w
     group_x = text_left + max(0, (text_area_w - group_w) / 2)
     center_y = (time_pill[1] + time_pill[3]) / 2
-    time_y = int(center_y - time_h / 2)
-    est_y = int(center_y - est_h / 2) + 1
-    draw.text((group_x, time_y), time_text, font=time_font, fill=white)
-    draw.text((group_x + time_w + time_gap, est_y), est_text, font=est_font, fill=green)
+    _draw_text_left_centered_on_y(draw, group_x, center_y, time_text, time_font, white, y_offset=0)
+    _draw_text_left_centered_on_y(draw, group_x + time_w + time_gap, center_y, est_text, est_font, green, y_offset=1)
 
     divider_x = time_pill[2] + 14
     draw.line((divider_x, time_pill[1] + 6, divider_x, time_pill[3] - 6), fill=(48, 60, 68), width=2)
