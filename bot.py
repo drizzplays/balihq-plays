@@ -348,6 +348,8 @@ def _league_icon_path(league: str) -> Path | None:
         candidates.append(IMAGES_DIR / "tt_cup.png")
     if "setka" in normalized:
         candidates.append(IMAGES_DIR / "tt_setka.png")
+    if "czech liga" in normalized or "czech" in normalized:
+        candidates.append(IMAGES_DIR / "czech.png")
 
     slug = _slugify_league_name(league_text)
     if slug:
