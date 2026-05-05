@@ -956,7 +956,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     _draw_glossy_panel(img, alert_chip, 12, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
     _draw_text_centered(draw, alert_chip, alert_chip_text, alert_font, green)
     alert_center_y = (alert_chip[1] + alert_chip[3]) / 2
-    _draw_text_left_centered_on_y(draw, alert_chip[2] + 16, alert_center_y, "PLAY STARTING IN 5 MINUTES", alert_font, muted)
+    _draw_text_left_centered_on_y(draw, alert_chip[2] + 12, alert_center_y, "PLAY STARTING IN 5 MINUTES", alert_font, muted)
 
     badge_w = 132
     badge = (header[2] - INNER_PAD - badge_w, header[1] + 10, header[2] - INNER_PAD, header[3] - 10)
@@ -1039,7 +1039,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
         _draw_text_centered(draw, odds_chip, primary_odds, odds_font, white)
 
     if primary_unit:
-        unit_font = _font(26, True)
+        unit_font = _font(28, True)
         unit_text_w = _text_width(draw, primary_unit, unit_font)
         unit_chip_w = max(248, unit_text_w + 56)
         unit_right = odds_chip[0] - pill_gap if odds_chip else content_right
@@ -1088,7 +1088,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             sub_label = "OFFICIAL PLAY"
             label_font = _font(15, True)
             title_text = _moneyline_name_display(bet_text)
-            pill_font = _font(40, True)
+            pill_font = _font(38, True)
             pill_text = "MONEYLINE"
             pill_text_w = _text_width(draw, pill_text, pill_font)
             pill_pad_x = 16
