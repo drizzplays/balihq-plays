@@ -1089,7 +1089,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
             sub_label = "OFFICIAL PLAY"
             label_font = _font(15, True)
             title_text = _moneyline_name_display(bet_text)
-            pill_font = _font(38, True)
+            pill_font = _font(36, True)
             pill_text = "MONEYLINE"
             pill_text_w = _text_width(draw, pill_text, pill_font)
             pill_pad_x = 16
@@ -1137,16 +1137,52 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
 
         else:
             if single_totals_layout:
-                check_x = row_box[0] + 18
-                _draw_check(draw, check_x, row_box[1] + 18)
+                # Single totals layout mirrors the moneyline layout: boxed check,
+                # OFFICIAL PLAY label, bet text, and a TOTAL POINTS pill.
+                check_size = 54
+                inner_left_pad = 20
+                icon_text_gap = 18
+                icon_x = row_box[0] + inner_left_pad
+                icon_y = int(row_box[1] + ((row_box[3] - row_box[1]) - check_size) / 2) + 5
+                check_wrap = (icon_x, icon_y, icon_x + check_size, icon_y + check_size)
+                _draw_glossy_panel(img, check_wrap, 15, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=10)
+                green_check = (132, 255, 55)
+                draw.line((check_wrap[0] + 15, check_wrap[1] + 29, check_wrap[0] + 24, check_wrap[1] + 38), fill=green_check, width=6)
+                draw.line((check_wrap[0] + 23, check_wrap[1] + 38, check_wrap[0] + 38, check_wrap[1] + 18), fill=green_check, width=6)
 
-                main_x = check_x + 56
-                max_main_w = row_box[2] - main_x - 42
-                bet_fit, bet_font = _fit_text(draw, bet_text, max_main_w, 28, True, 18)
-                bbox = draw.textbbox((0, 0), bet_fit, font=bet_font)
-                bet_h = bbox[3] - bbox[1]
-                bet_y = row_box[1] + ((row_box[3] - row_box[1]) - bet_h) / 2 - bbox[1]
-                draw.text((main_x, bet_y), bet_fit, font=bet_font, fill=white)
+                content_x = icon_x + check_size + icon_text_gap
+                sub_label = "OFFICIAL PLAY"
+                label_font = _font(15, True)
+                title_text = bet_text
+                pill_font = _font(36, True)
+                pill_text = "TOTAL POINTS"
+                pill_text_w = _text_width(draw, pill_text, pill_font)
+                pill_pad_x = 16
+                pill_h = 50
+                pill_w = pill_text_w + pill_pad_x * 2
+                title_gap = 10
+
+                row_right_pad = 18
+                content_w = max(120, (row_box[2] - row_right_pad) - content_x)
+                max_title_w = max(80, content_w - pill_w - title_gap)
+                big_bet, big_font = _fit_text(draw, title_text, max_title_w, 47, True, 24)
+                title_w = _text_width(draw, big_bet, big_font)
+                title_h = _text_height(draw, big_bet, big_font)
+
+                text_gap = 9
+                label_h = _text_height(draw, sub_label, label_font)
+                title_line_h = max(title_h, pill_h)
+                text_group_h = label_h + text_gap + title_line_h
+                text_group_y = int(row_box[1] + ((row_box[3] - row_box[1]) - text_group_h) / 2) - 1
+                draw.text((content_x, text_group_y), sub_label, font=label_font, fill=off_white)
+
+                title_center_y = text_group_y + label_h + text_gap + title_line_h / 2
+                _draw_text_left_centered_on_y(draw, content_x, title_center_y, big_bet, big_font, white)
+
+                market_chip_x1 = content_x + title_w + title_gap
+                market_chip = (market_chip_x1, int(title_center_y - pill_h / 2), market_chip_x1 + pill_w, int(title_center_y - pill_h / 2) + pill_h)
+                _draw_glossy_panel(img, market_chip, 18, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
+                _draw_text_centered(draw, market_chip, pill_text, pill_font, green, y_offset=-1)
             else:
                 num_chip = (row_box[0] + 18, row_box[1] + 21, row_box[0] + 60, row_box[1] + 63)
                 _draw_glossy_panel(img, num_chip, 14, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
