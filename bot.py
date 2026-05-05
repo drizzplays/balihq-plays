@@ -1,3 +1,11 @@
+"""BaliHQBets Discord card poster.
+
+Reads Google Sheet tabs, generates a branded betting card with Pillow, posts it
+to Discord, and marks the source row as posted. The code is intentionally split
+into sections so another developer can find the sheet, formatting, rendering,
+and posting logic quickly.
+"""
+
 import os
 from pathlib import Path
 import json
@@ -15,6 +23,10 @@ try:
 except ImportError as exc:
     raise RuntimeError("Pillow is required. Add pillow to requirements.txt") from exc
 
+
+# =============================================================================
+# Configuration
+# =============================================================================
 
 DISCORD_EMBED_COLOR = 0x7CFF00
 ROLE_ID = "1500237161335881768"
@@ -46,6 +58,10 @@ POST_WINDOW_MINUTES = 5
 POST_LATE_GRACE_MINUTES = 3
 MAX_POSTS_PER_RUN = 1
 
+
+# =============================================================================
+# Google Sheets row parsing
+# =============================================================================
 
 def _normalize_header(header: str) -> str:
     return str(header or "").strip()
@@ -113,6 +129,10 @@ def _get_value(row: dict, *keys: str, fallback: str = "N/A") -> str:
     return fallback
 
 
+# =============================================================================
+# Scheduling / post window logic
+# =============================================================================
+
 def _parse_est_datetime(row: dict) -> datetime | None:
     est_text = _get_value(row, "EST", fallback="").strip()
     if not est_text:
@@ -178,6 +198,10 @@ def _is_post_time(row: dict) -> tuple[bool, str]:
     )
 
 
+# =============================================================================
+# Font and text measurement helpers
+# =============================================================================
+
 def _font(size: int, bold: bool = False):
     # Preferred card font. Put Lexend files in /fonts inside the project.
     # Works with Regular only, or Bold/SemiBold if you add them later.
@@ -231,6 +255,10 @@ def _fit_text(draw: ImageDraw.ImageDraw, text: str, max_width: int, size: int, b
     return text + ellipsis, font
 
 
+# =============================================================================
+# Low-level drawing helpers
+# =============================================================================
+
 def _rounded_rect(draw: ImageDraw.ImageDraw, box, radius, fill, outline=None, width=1):
     draw.rounded_rectangle(box, radius=radius, fill=fill, outline=outline, width=width)
 
@@ -269,33 +297,6 @@ def _paste_cover(canvas: Image.Image, image_path: Path, box: tuple[int, int, int
     canvas.alpha_composite(img, (box[0], box[1]))
 
 
-
-
-def _paste_contain_rounded(canvas: Image.Image, image_path: Path, box: tuple[int, int, int, int], radius: int = 0, bg_fill=(0, 0, 0, 0)):
-    if not image_path.exists():
-        return
-
-    target_w = box[2] - box[0]
-    target_h = box[3] - box[1]
-    layer = Image.new("RGBA", (target_w, target_h), bg_fill)
-
-    img = Image.open(image_path).convert("RGBA")
-    img.thumbnail((target_w, target_h), Image.LANCZOS)
-    x = (target_w - img.width) // 2
-    y = (target_h - img.height) // 2
-    layer.alpha_composite(img, (x, y))
-
-    if radius > 0:
-        mask = Image.new("L", (target_w, target_h), 0)
-        md = ImageDraw.Draw(mask)
-        md.rounded_rectangle((0, 0, target_w - 1, target_h - 1), radius=radius, fill=255)
-        clipped = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
-        clipped.paste(layer, (0, 0), mask)
-        layer = clipped
-
-    canvas.alpha_composite(layer, (box[0], box[1]))
-
-
 def _paste_circle(canvas: Image.Image, image_path: Path, box: tuple[int, int, int, int], border_color=(124, 255, 0), border=4):
     if not image_path.exists():
         return
@@ -322,6 +323,10 @@ def _paste_circle(canvas: Image.Image, image_path: Path, box: tuple[int, int, in
     y = box[1] + (target_h - size) // 2
     canvas.alpha_composite(circ, (x, y))
 
+
+# =============================================================================
+# League assets
+# =============================================================================
 
 def _slugify_league_name(value: str) -> str:
     value = str(value or "").strip().lower()
@@ -523,6 +528,10 @@ def _draw_text_left_centered_on_y(draw: ImageDraw.ImageDraw, x: int | float, cen
     draw.text((draw_x, draw_y), text, font=font, fill=fill)
 
 
+# =============================================================================
+# Bet / market formatting
+# =============================================================================
+
 def _unit_display(unit: str) -> str:
     value = str(unit or "").strip().upper().replace("UNITS", "").replace("UNIT", "").replace("U", "").strip()
     if not value:
@@ -542,7 +551,6 @@ def _unit_display(unit: str) -> str:
 
 def _odds_display(odds: str) -> str:
     return str(odds or "").strip().upper()
-
 
 
 def _moneyline_name_display(bet: str) -> str:
@@ -573,14 +581,9 @@ def _draw_clock(draw: ImageDraw.ImageDraw, x: int, y: int):
     draw.line((x + 23, y + 24, x + 33, y + 31), fill=green, width=3)
 
 
-def _draw_megaphone(draw: ImageDraw.ImageDraw, x: int, y: int, color=(132, 255, 55)):
-    # clean custom alert icon so we don't depend on emoji font rendering
-    draw.polygon([(x + 4, y + 10), (x + 17, y + 5), (x + 17, y + 21), (x + 4, y + 16)], fill=color)
-    draw.rectangle((x + 17, y + 9, x + 21, y + 17), fill=color)
-    draw.line((x + 8, y + 16, x + 5, y + 22), fill=color, width=3)
-    draw.arc((x + 18, y + 4, x + 27, y + 13), start=300, end=60, fill=color, width=2)
-    draw.arc((x + 18, y + 8, x + 31, y + 19), start=305, end=55, fill=color, width=2)
-
+# =============================================================================
+# Play collection from duplicated sheet columns
+# =============================================================================
 
 def _iter_numbered_values(normalized: dict, base_names: tuple[str, ...], max_items: int = 10) -> list[str]:
     """Return values from duplicated/numbered sheet headers like BET, BET 2, BET 3."""
@@ -733,23 +736,9 @@ def _collect_plays(row: dict, forced_market_type: str | None = None) -> list[dic
     return plays
 
 
-def _play_label(play: dict) -> str:
-    label = str(play.get("bet", "") or "No Bet Found").strip()
-    history = str(play.get("history", "") or "").strip()
-
-    if history and play.get("market_type") != "moneyline":
-        label += f"  •  {history} L20"
-
-    return label
-
-
-def _format_unit(unit: str) -> str:
-    unit = str(unit or "").strip()
-    if not unit:
-        return ""
-    unit = unit.upper() if unit.lower().endswith("u") else f"{unit}U"
-    return unit
-
+# =============================================================================
+# Card banner rendering
+# =============================================================================
 
 def _draw_market_banner(img: Image.Image, banner_frame: tuple[int, int, int, int], market_type: str):
     draw = ImageDraw.Draw(img)
@@ -843,6 +832,10 @@ def _draw_market_banner(img: Image.Image, banner_frame: tuple[int, int, int, int
     glow = glow.filter(ImageFilter.GaussianBlur(18))
     img.alpha_composite(glow)
 
+
+# =============================================================================
+# Main card renderer
+# =============================================================================
 
 def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Path:
     league = _get_value(row, "LEAGUE", fallback="TT Elite")
@@ -940,7 +933,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     _draw_glossy_panel(img, shell, 30, (10, 15, 19, 255), (5, 8, 11, 255), outline=(42, 54, 62), inner_outline=(255, 255, 255, 8), gloss_alpha=12)
     draw.rounded_rectangle((shell[0] + 12, shell[1] + 12, shell[2] - 12, shell[3] - 12), radius=26, outline=(14, 21, 27), width=1)
 
-    # header
+    # --- Header / brand bar -------------------------------------------------
     header = (panel_x1, header_y, panel_x2, header_y + header_h)
     _draw_drop_shadow(img, header, radius=22, offset=(0, 8), blur=18, alpha=72)
     _draw_glossy_panel(img, header, 22, (16, 24, 30, 255), (7, 11, 15, 255), outline=(42, 56, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=18)
@@ -966,7 +959,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     _draw_glossy_panel(img, badge, 18, (17, 25, 30, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
     _paste_contain(img, AVATAR_PATH, (badge[0] + 18, badge[1] + 8, badge[2] - 18, badge[3] - 8))
 
-    # matchup
+    # --- Matchup / start time panel ----------------------------------------
     hero = (panel_x1, hero_y, panel_x2, hero_y + hero_h)
     _draw_drop_shadow(img, hero, radius=24, offset=(0, 10), blur=20, alpha=78)
     _draw_glossy_panel(img, hero, 24, (13, 19, 23, 255), (6, 10, 13, 255), outline=(42, 56, 64), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
@@ -1013,7 +1006,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     else:
         draw.text((tx, ty), matchup_text, font=matchup_font, fill=white)
 
-    # board
+    # --- Lower board: league, unit, plays, and banner ----------------------
     board = (panel_x1, board_y, panel_x2, board_bottom)
     # Shared lower-panel rails. TT badge, official play, banner, and unit badge
     # all snap to these instead of using local offsets.
@@ -1250,6 +1243,10 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     img.save(GENERATED_CARD_PATH, quality=95)
     return GENERATED_CARD_PATH
 
+# =============================================================================
+# Discord posting
+# =============================================================================
+
 def _build_embed_payload(card_file_name: str, avatar_file_name: str | None = None) -> dict:
     embed = {
         "color": DISCORD_EMBED_COLOR,
@@ -1292,6 +1289,10 @@ def _post_card_to_discord(webhook_url: str, card_path: Path) -> requests.Respons
             file_obj.close()
 
 
+# =============================================================================
+# Worksheet posting state
+# =============================================================================
+
 def _ensure_posted_column(sheet, header_map: dict) -> int:
     if "posted" in header_map:
         return header_map["posted"]
@@ -1306,6 +1307,9 @@ def _mark_posted(sheet, row_number: int, posted_col: int):
     sheet.update_cell(row_number, posted_col, now)
 
 
+# =============================================================================
+# Automation flow
+# =============================================================================
 
 def _worksheet_jobs(client, sheet_id: str):
     """Return worksheet + forced market type jobs.
