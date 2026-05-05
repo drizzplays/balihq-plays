@@ -856,6 +856,7 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     primary_unit = _unit_display(plays[0].get("unit", "") or _get_value(row, "Unit", "Units", "Stake", fallback=""))
     primary_odds = _odds_display(plays[0].get("odds", "") or _get_value(row, "Odds", "Price", "Line", fallback=""))
     single_moneyline_layout = market_type == "moneyline" and play_count == 1
+    single_totals_layout = market_type == "totals" and play_count == 1
 
     width = 1200
 
@@ -1135,45 +1136,57 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
                 _draw_text_centered(draw, odds_chip, odds_text, odds_font, white, y_offset=1)
 
         else:
-            num_chip = (row_box[0] + 18, row_box[1] + 21, row_box[0] + 60, row_box[1] + 63)
-            _draw_glossy_panel(img, num_chip, 14, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
-            n_txt = str(idx)
-            n_w = _text_width(draw, n_txt, _font(20, True))
-            _draw_text_vcenter(draw, num_chip, n_txt, _font(20, True), green, x=num_chip[0] + ((num_chip[2] - num_chip[0]) - n_w) / 2)
+            if single_totals_layout:
+                check_x = row_box[0] + 18
+                _draw_check(draw, check_x, row_box[1] + 18)
 
-            check_x = num_chip[2] + 18
-            _draw_check(draw, check_x, row_box[1] + 18)
-
-            main_x = check_x + 56
-            max_main_w = row_box[2] - main_x - 42
-
-            if history_text and market_type != "moneyline":
-                record = f"{history_text} L20"
-                record_font = _font(20, True)
-                bullet_font = _font(20, True)
-                record_w = _text_width(draw, record, record_font)
-                bullet_w = _text_width(draw, "  •  ", bullet_font)
-                bet_fit, bet_font = _fit_text(draw, bet_text, max_main_w - record_w - bullet_w, 24, True, 16)
-                draw.text((main_x, row_box[1] + 15), bet_fit, font=bet_font, fill=white)
-                bet_w = _text_width(draw, bet_fit, bet_font)
-                draw.text((main_x + bet_w, row_box[1] + 15), "  •  ", font=bullet_font, fill=off_white)
-                draw.text((main_x + bet_w + bullet_w, row_box[1] + 15), record, font=record_font, fill=white)
+                main_x = check_x + 56
+                max_main_w = row_box[2] - main_x - 42
+                bet_fit, bet_font = _fit_text(draw, bet_text, max_main_w, 28, True, 18)
+                bbox = draw.textbbox((0, 0), bet_fit, font=bet_font)
+                bet_h = bbox[3] - bbox[1]
+                bet_y = row_box[1] + ((row_box[3] - row_box[1]) - bet_h) / 2 - bbox[1]
+                draw.text((main_x, bet_y), bet_fit, font=bet_font, fill=white)
             else:
-                bet_fit, bet_font = _fit_text(draw, bet_text, max_main_w, 24, True, 16)
-                draw.text((main_x, row_box[1] + 15), bet_fit, font=bet_font, fill=white)
+                num_chip = (row_box[0] + 18, row_box[1] + 21, row_box[0] + 60, row_box[1] + 63)
+                _draw_glossy_panel(img, num_chip, 14, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=16)
+                n_txt = str(idx)
+                n_w = _text_width(draw, n_txt, _font(20, True))
+                _draw_text_vcenter(draw, num_chip, n_txt, _font(20, True), green, x=num_chip[0] + ((num_chip[2] - num_chip[0]) - n_w) / 2)
 
-            meta_parts = []
-            scenario = str(play.get("scenario", "") or "").strip()
-            if scenario:
-                meta_parts.append(f"If {scenario}" if not scenario.lower().startswith("if ") else scenario)
-            if play.get("unit"):
-                meta_parts.append(_unit_display(play.get("unit", "")))
-            if history_text and market_type == "totals":
-                meta_parts.append("History " + history_text)
-            if meta_parts:
-                meta_line = "   •   ".join(meta_parts)
-                meta_fit, meta_font = _fit_text(draw, meta_line, max_main_w, 14, False, 11)
-                draw.text((main_x, row_box[1] + 46), meta_fit, font=meta_font, fill=off_white)
+                check_x = num_chip[2] + 18
+                _draw_check(draw, check_x, row_box[1] + 18)
+
+                main_x = check_x + 56
+                max_main_w = row_box[2] - main_x - 42
+
+                if history_text and market_type != "moneyline":
+                    record = f"{history_text} L20"
+                    record_font = _font(20, True)
+                    bullet_font = _font(20, True)
+                    record_w = _text_width(draw, record, record_font)
+                    bullet_w = _text_width(draw, "  •  ", bullet_font)
+                    bet_fit, bet_font = _fit_text(draw, bet_text, max_main_w - record_w - bullet_w, 24, True, 16)
+                    draw.text((main_x, row_box[1] + 15), bet_fit, font=bet_font, fill=white)
+                    bet_w = _text_width(draw, bet_fit, bet_font)
+                    draw.text((main_x + bet_w, row_box[1] + 15), "  •  ", font=bullet_font, fill=off_white)
+                    draw.text((main_x + bet_w + bullet_w, row_box[1] + 15), record, font=record_font, fill=white)
+                else:
+                    bet_fit, bet_font = _fit_text(draw, bet_text, max_main_w, 24, True, 16)
+                    draw.text((main_x, row_box[1] + 15), bet_fit, font=bet_font, fill=white)
+
+                meta_parts = []
+                scenario = str(play.get("scenario", "") or "").strip()
+                if scenario:
+                    meta_parts.append(f"If {scenario}" if not scenario.lower().startswith("if ") else scenario)
+                if play.get("unit"):
+                    meta_parts.append(_unit_display(play.get("unit", "")))
+                if history_text and market_type == "totals":
+                    meta_parts.append("History " + history_text)
+                if meta_parts:
+                    meta_line = "   •   ".join(meta_parts)
+                    meta_fit, meta_font = _fit_text(draw, meta_line, max_main_w, 14, False, 11)
+                    draw.text((main_x, row_box[1] + 46), meta_fit, font=meta_font, fill=off_white)
 
         current_y += row_h + row_gap
 
