@@ -795,6 +795,9 @@ def _draw_market_banner(img: Image.Image, banner_frame: tuple[int, int, int, int
     if market_type == "live":
         subtitle = "TABLE TENNIS LIVE PLAYS"
         badge = "LIVE CARD"
+    elif market_type == "moneyline":
+        subtitle = "TABLE TENNIS MONEYLINES"
+        badge = "MONEYLINE CARD"
     else:
         subtitle = "TABLE TENNIS TOTALS"
         badge = "TOTALS CARD"
@@ -951,8 +954,9 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     alert_chip_w = _text_width(draw, alert_chip_text, alert_font) + 24
     alert_chip = (title_x, alert_y, title_x + alert_chip_w, alert_y + 26)
     _draw_glossy_panel(img, alert_chip, 12, (18, 25, 31, 255), (8, 12, 16, 255), outline=(44, 57, 66), inner_outline=(255, 255, 255, 8), gloss_alpha=14)
-    _draw_text_vcenter(draw, alert_chip, alert_chip_text, alert_font, green, x=alert_chip[0] + 12)
-    draw.text((alert_chip[2] + 16, alert_y + 0), "PLAY STARTING IN 5 MINUTES", font=alert_font, fill=muted)
+    _draw_text_centered(draw, alert_chip, alert_chip_text, alert_font, green)
+    alert_center_y = (alert_chip[1] + alert_chip[3]) / 2
+    _draw_text_left_centered_on_y(draw, alert_chip[2] + 16, alert_center_y, "PLAY STARTING IN 5 MINUTES", alert_font, muted)
 
     badge_w = 132
     badge = (header[2] - INNER_PAD - badge_w, header[1] + 10, header[2] - INNER_PAD, header[3] - 10)
@@ -1179,10 +1183,13 @@ def _generate_pick_card(row: dict, forced_market_type: str | None = None) -> Pat
     banner_inner = (banner_frame[0] + 12, banner_frame[1] + 12, banner_frame[2] - 12, banner_frame[3] - 12)
     if market_type == "moneyline":
         if play_count == 1:
-            banner_source = MONEYLINE_BANNER_PATH if MONEYLINE_BANNER_PATH.exists() else (MONEYLINES_BANNER_PATH if MONEYLINES_BANNER_PATH.exists() else BANNER_PATH)
+            banner_source = MONEYLINE_BANNER_PATH if MONEYLINE_BANNER_PATH.exists() else (MONEYLINES_BANNER_PATH if MONEYLINES_BANNER_PATH.exists() else None)
         else:
-            banner_source = MONEYLINES_BANNER_PATH if MONEYLINES_BANNER_PATH.exists() else (MONEYLINE_BANNER_PATH if MONEYLINE_BANNER_PATH.exists() else BANNER_PATH)
-        _paste_cover(img, banner_source, banner_inner, radius=18)
+            banner_source = MONEYLINES_BANNER_PATH if MONEYLINES_BANNER_PATH.exists() else (MONEYLINE_BANNER_PATH if MONEYLINE_BANNER_PATH.exists() else None)
+        if banner_source is not None:
+            _paste_cover(img, banner_source, banner_inner, radius=18)
+        else:
+            _draw_market_banner(img, banner_frame, market_type)
     elif market_type == "live":
         _draw_market_banner(img, banner_frame, market_type)
     else:
